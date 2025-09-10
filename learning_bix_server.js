@@ -81,19 +81,6 @@ app.use(function (req, res, next) {
 
 
 
-var AWS = require('aws-sdk');
-AWS.config.update({
-    accessKeyId: "AKIAZNJI33ZWAGS5TKVX",
-    secretAccessKey: "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",
-    //"region": "s3-us-west-2" 
-});
-const s3 = new AWS.S3({   signatureVersion: 'v4',  })
-var photoBucket = new AWS.S3({
-    params: {
-        Bucket: 'learningbix.com'
-    }
-})
-
 /* upload file */
 const multer = require('multer');
 
