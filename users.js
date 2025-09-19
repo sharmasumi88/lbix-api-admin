@@ -160,6 +160,11 @@ module.exports.class_badges_list = class_badges_list;
 module.exports.teacher_student_course_summary_track = teacher_student_course_summary_track;
 
 module.exports.send_enquiry_email = send_enquiry_email;
+module.exports.overall_details_teacher = overall_details_teacher;
+
+module.exports.grades_list = grades_list;
+module.exports.school_user_list = school_user_list;
+module.exports.reviews_list = reviews_list;
 
 
 
@@ -7412,4 +7417,245 @@ function send_enquiry_email(userdata, pool, callback){
 			});
 	}					
 	
+}
+
+
+/* user List */
+function overall_details_teacher(userdata, pool, callback) {
+	var resultJson = '';
+	var teacher_id=' ';
+	var Keyconditoin='';
+	if (typeof userdata.teacher_id  != 'undefined' && userdata.teacher_id  != '') {
+		teacher_id  = userdata.teacher_id ;
+	}
+	pool.getConnection(function (err, connection) {
+		
+		
+		var Catquery='Select users.id,users.name,(Select SUM(total_points) from overall_leaderboard where school_code=users.school_code and class_name IN(Select grade_name from teachers_grades tg LEFT JOIN gradeName gn on tg.grade_id =gn.grade_id where teacher_id=users.id)) all_points from users where users.id ="' + teacher_id + '" ';
+
+		console.log('Catquery',Catquery)
+		connection.query(Catquery, function(errSelpiMG,respROiMG){
+			if(errSelpiMG){
+				
+				resultJson = '{"replyCode":"error","replyMsg":"'+errSelpiMG.message+'","cmd":"school_user_list"}\n';
+				connection.release();
+				callback(200, null, resultJson);
+				return;
+			}else{
+				resultJson = '{"replyCode":"success","replyMsg":"Details found successfully .","data":'+JSON.stringify(respROiMG)+',"cmd":"school_user_list"}\n';
+				console.log('res-suceess');
+				connection.release();
+				callback(200, null, resultJson);
+				return;
+			}
+		});
+	});
+}
+
+
+/* grades list */
+function grades_list(userdata, pool, callback) {
+	var resultJson = '';
+
+	var keyword = '';
+	if (typeof userdata.keyword != 'undefined' && userdata.keyword != '') {
+		keyword = userdata.keyword;
+	}
+
+	pool.getConnection(function (err, connection) {
+		if (keyword != '') {
+			Keyconditoin = ' AND grades.grade_name LIKE  "%' + keyword + '%"';
+		}
+		detailsquery = 'SELECT grades.* from grades where grades.status !="2"';
+		console.log('detailsquery', detailsquery);
+		connection.query(detailsquery, function (errSelDetails, resSelDetails) {
+			if (errSelDetails) {
+				resultJson = '{"replyCode":"error","replyMsg":"' + errSelDetails.message + '","cmd":"grades"}\n';
+				connection.release();
+				callback(200, null, resultJson);
+				return;
+			} else {
+				resultJson =
+					'{"replyCode":"success","replyMsg":"Details found successfully .","data":' +
+					JSON.stringify(resSelDetails) +
+					',"cmd":"grades"}\n';
+				console.log('res-suceess');
+				connection.release();
+				callback(200, null, resultJson);
+				return;
+			}
+		});
+	});
+}
+
+
+/* user List */
+function school_user_list(userdata, pool, callback) {
+	var resultJson = '';
+	var strJson = '';
+	var keyword = '';
+	var role_id = '2';
+	var class_name = '';
+	var school_code='';
+	var Keyconditoin = ' ';
+	var resPro=[];
+	var start = '0';
+	var limit = '20';
+	var subscribed ='';
+	var learning ='';
+	var filtered ="";
+	var limitStr ='';
+	if (typeof userdata.keyword != 'undefined' && userdata.keyword != '') {
+		keyword = userdata.keyword;
+	}
+	if (typeof userdata.role_id != 'undefined' && userdata.role_id != '') {
+		role_id = userdata.role_id;
+	}
+	if (typeof userdata.class_name != 'undefined' && userdata.class_name != '') {
+		class_name = userdata.class_name;
+	}
+	
+	if (typeof userdata.school_code != 'undefined' && userdata.school_code != '') {
+		school_code = userdata.school_code;
+	}
+
+	if (typeof userdata.start != 'undefined' && userdata.start != '') {
+		start = userdata.start;
+	}
+	if (typeof userdata.limit != 'undefined' && userdata.limit != '') {
+		limit = userdata.limit;
+	}
+	
+	if (typeof userdata.subscribed  != 'undefined' && userdata.subscribed  != '') {
+		subscribed  = userdata.subscribed ;
+	}
+	if (typeof userdata.learning  != 'undefined' && userdata.learning  != '') {
+		learning  = userdata.learning ;
+	}
+
+	if(limit !=''){
+		limitStr='LIMIT '+start+', '+limit+'';
+	}
+	pool.getConnection(function (err, connection) {
+		if (keyword != '') {
+			Keyconditoin += ' AND users.name LIKE  "%' + keyword + '%"';
+		}
+
+		if (role_id != '') {
+			Keyconditoin += ' AND users.role_id ="' + role_id + '"';
+		}
+
+		if (learning != '') {
+			Keyconditoin += ' AND users.learning ="' + learning + '"';
+		}
+		if (school_code != '') {
+			Keyconditoin += ' AND users.school_code ="' + school_code + '"';
+		}
+		var countREs=0;
+		var i = 0;
+		console.log('class_name',class_name);
+		async.eachSeries(class_name,function(rec2, loop2){
+			var clss = rec2;
+			//LEFT JOIN (Select student_id,SUM(total_points) from student_course_summary_points) ON school_user_list.student_id=student_course_summary_points.student_id
+			//(SELECT SUM(total_points) from student_course_summary_points where student_course_summary_points.student_id =users.id ) as total_points 
+			//var countquery = 'SELECT COUNT(users.id) as count from users LEFT JOIN student_lesson_count slc on users.id=slc.student_id  LEFT JOIN age_group as age_group ON age_group.id = users.age_group_id  WHERE users.class_name ="'+clss+'"  ' + Keyconditoin + ' ORDER BY users.id DESC';
+			var countquery = 'SELECT COUNT(users.id) as count from users  WHERE users.status !="2"  ' + Keyconditoin + ' ORDER BY users.id DESC';
+			console.log('countquery',countquery);
+			connection.query(countquery, function (errC, responsecount) {
+				if (errC) {
+					resultJson = '{"replyCode":"error","replyMsg":"' + errC.message + '","cmd":"user_list"}\n';
+					connection.release();
+					callback(200, null, resultJson);
+					return;
+				} else {
+					//(SELECT SUM(total_points) from student_course_summary_points where student_course_summary_points.student_id =users.id ) as total_points
+					countREs=countREs+responsecount[0].count;
+					//var Catquery='Select users.*,"0" as total_points,(SELECT COUNT(id) from student_course_subscription where student_course_subscription.student_id=users.id AND student_course_subscription.status="1") as subscribed,age_group.title,slc.lesson_count,slc.completed_lessons,(Select SUM(lesson_count) total_lessons from (Select scs.course_id,clc.lesson_count from student_course_subscription scs LEFT JOIN course_lesson_count clc on scs.course_id =clc.course_id where student_id=users.id) main_data) total_lessons from users LEFT JOIN student_lesson_count slc on users.id=slc.student_id  LEFT JOIN age_group as age_group ON age_group.id = users.age_group_id  WHERE users.class_name ="'+clss+'"  ' + Keyconditoin + ' ORDER BY users.id DESC LIMIT ' + start + ', ' + limit + '';
+					
+					//var Catquery='Select users.*,(SELECT leaderboard.total_points from leaderboard where leaderboard.id=users.id) as total_points,(SELECT COUNT(id) from student_course_subscription where student_course_subscription.student_id=users.id AND student_course_subscription.status="1") as subscribed,age_group.title,"0" as lesson_count,"0" as completed_lessons,"0" as total_lessons from users LEFT JOIN age_group as age_group ON age_group.id = users.age_group_id  WHERE users.class_name ="'+clss+'"  ' + Keyconditoin + ' ORDER BY users.id DESC ';
+					
+					var Catquery='Select users.*,age_group.title from users LEFT JOIN age_group as age_group ON age_group.id = users.age_group_id  WHERE users.class_name ="'+clss+'"  ' + Keyconditoin + ' ORDER BY users.id DESC '+limitStr+' ';
+
+					console.log('Catquery',Catquery);
+					connection.query(Catquery, function(errSelpiMG,respROiMG){
+						if(errSelpiMG){
+							console.log('errSelpiMG',errSelpiMG);
+							loop2();
+						}else{
+							console.log('respROiMG',respROiMG)
+							resPro=resPro.concat(respROiMG);
+							loop2();
+						}
+						i=i+1;
+					});
+				}
+			})
+		},function(errSelPro){
+			if(errSelPro){
+				console.log('errSelPro',errSelPro);
+				resultJson = '{"replyCode":"error","replyMsg":"'+errSelPro.message+'","cmd":"school_user_list"}\n';
+				connection.release();
+				callback(200, null, resultJson);
+				return;
+			}else{
+				console.log('resPro',resPro);
+				var ids = resPro.map(o => o.id)
+				filtered = resPro.filter(({id}, index) => !ids.includes(id, index + 1));
+				
+				resultJson = '{"replyCode":"success","replyMsg":"Details found successfully ","data":'+JSON.stringify(filtered)+',"totalCount":'+countREs+',"cmd":"school_user_list"}\n';
+				console.log('res-suceess');
+				connection.release();
+				callback(200, null, resultJson);
+				return;
+				
+			}
+		});
+		
+	});
+}
+
+
+/* reviews list */
+function reviews_list(userdata, pool, callback) {
+	var resultJson = '';
+
+	var Keyconditoin = ' reviews.status !="2"';
+	var teacher_id = '';
+	var student_id = '';
+	if (typeof userdata.teacher_id != 'undefined' && userdata.teacher_id != '') {
+		teacher_id = userdata.teacher_id;
+	}
+	if (typeof userdata.student_id != 'undefined' && userdata.student_id != '') {
+		student_id = userdata.student_id;
+	}
+
+	pool.getConnection(function (err, connection) {
+		if (teacher_id != '') {
+			Keyconditoin += ' AND reviews.teacher_id = "' + teacher_id + '"';
+		}
+		
+		if (student_id != '') {
+			Keyconditoin += ' AND reviews.student_id = "' + student_id + '"';
+		}
+
+		detailsquery = 'SELECT reviews.*,users.name as student_name,users.image as student_image,teacher.name as teacher_name,teacher.image as teacher_image from reviews LEFT JOIN users as users ON users.id = reviews.student_id LEFT JOIN users as teacher ON teacher.id = reviews.teacher_id where '+Keyconditoin+'';
+		console.log('detailsquery', detailsquery);
+		connection.query(detailsquery, function (errSelDetails, resSelDetails) {
+			if (errSelDetails) {
+				resultJson = '{"replyCode":"error","replyMsg":"' + errSelDetails.message + '","cmd":"grades"}\n';
+				connection.release();
+				callback(200, null, resultJson);
+				return;
+			} else {
+				resultJson =
+					'{"replyCode":"success","replyMsg":"Details found successfully .","data":' +
+					JSON.stringify(resSelDetails) +
+					',"cmd":"grades"}\n';
+				console.log('res-suceess');
+				connection.release();
+				callback(200, null, resultJson);
+				return;
+			}
+		});
+	});
 }

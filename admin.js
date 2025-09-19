@@ -52,6 +52,8 @@ module.exports.certificate_details = certificate_details;
 module.exports.update_certificate_status = update_certificate_status;
 module.exports.update_user_comment = update_user_comment;
 module.exports.user_dropdown_list = user_dropdown_list;
+
+module.exports.faqs_list = faqs_list;
 module.exports.add_faqs = add_faqs;
 module.exports.faqs_details = faqs_details;
 module.exports.update_faqs_status = update_faqs_status;
@@ -268,6 +270,8 @@ module.exports.class_languages_details = class_languages_details;
 module.exports.update_class_languages_status = update_class_languages_status;
 
 module.exports.register_user_fun_android = register_user_fun_android;
+
+module.exports.badges_list = badges_list;
 module.exports.add_badges = add_badges;
 module.exports.badges_details = badges_details;
 module.exports.update_badges_status = update_badges_status;
@@ -309,6 +313,15 @@ module.exports.redeem_course_code = redeem_course_code;
 
 module.exports.link_setting_update = link_setting_update;
 module.exports.link_setting_details = link_setting_details;
+
+//Left
+module.exports.user_list = user_list;
+module.exports.courses_list = courses_list;
+module.exports.school_grades_list = school_grades_list;
+
+module.exports.admin_school_generated_payout_list = admin_school_generated_payout_list;
+module.exports.assign_course_to_student_bulk = assign_course_to_student_bulk;
+module.exports.assign_course_to_student = assign_course_to_student;
 
 
 var ToDate = new Date();
@@ -1853,6 +1866,55 @@ function update_user_comment(userdata, pool, callback) {
 }
 
 // FAQs
+
+function faqs_list(userdata, pool, callback) {
+	var resultJson = '';
+	var type = '1'; //type 1-teacher,2-student,3-schoo;
+	var keyword = '';
+	var isAdmin = '1';
+	var Keyconditoin = '';
+	if (typeof userdata.keyword != 'undefined' && userdata.keyword != '') {
+		keyword = userdata.keyword;
+	}
+	if (typeof userdata.type != 'undefined' && userdata.type != '') {
+		type = userdata.type;
+	}
+	if (typeof userdata.isAdmin != 'undefined' && userdata.isAdmin != '') {
+		isAdmin = userdata.isAdmin;
+	}
+
+	pool.getConnection(function (err, connection) {
+		if (keyword != '') {
+			Keyconditoin = ' AND faqs.question LIKE  "%' + keyword + '%"';
+		}
+		if (isAdmin == '0') {
+			detailsquery = 'SELECT faqs.* from faqs where faqs.status ="1" AND type="' + type + '" ' + Keyconditoin + '';
+		} else {
+			detailsquery = 'SELECT faqs.* from faqs where faqs.status !="2" AND type="' + type + '" ' + Keyconditoin + '';
+		}
+
+		console.log('detailsquery', detailsquery);
+		connection.query(detailsquery, function (errSelDetails, resSelDetails) {
+			if (errSelDetails) {
+				resultJson = '{"replyCode":"error","replyMsg":"' + errSelDetails.message + '","cmd":"faqs_list"}\n';
+				connection.release();
+				callback(200, null, resultJson);
+				return;
+			} else {
+				resultJson =
+					'{"replyCode":"success","replyMsg":"Details found successfully .","data":' +
+					JSON.stringify(resSelDetails) +
+					',"cmd":"faqs_list"}\n';
+				console.log('res-suceess');
+				connection.release();
+				callback(200, null, resultJson);
+				return;
+			}
+		});
+	});
+}
+
+
 function add_faqs(userdata, pool, callback) {
 	var resultJson = '';
 	var question = '';
@@ -1980,6 +2042,90 @@ function update_faqs_status(userdata, pool, callback) {
 				return;
 			}
 		});
+	});
+}
+
+
+//courses
+
+function courses_list(userdata, pool, callback) {
+	var resultJson = '';
+	var learning = '';
+	var keyword = '';
+	var Keyconditoin = '';
+	var start = '0';
+	var limit = '';
+
+	if (typeof userdata.keyword != 'undefined' && userdata.keyword != '') {
+		keyword = userdata.keyword;
+	}
+
+	if (typeof userdata.learning != 'undefined' && userdata.learning != '') {
+		learning = userdata.learning;
+	}
+	if (typeof userdata.start != 'undefined' && userdata.start != '') {
+		start = userdata.start;
+	}
+	if (typeof userdata.limit != 'undefined' && userdata.limit != '') {
+		limit = userdata.limit;
+	}
+
+
+	pool.getConnection(function (err, connection) {
+		if (keyword != '') {
+			Keyconditoin += ' AND courses.course_name LIKE  "%' + keyword + '%"';
+		}
+		if (learning != '') {
+			Keyconditoin += ' AND courses.learning ="' + learning + '"';
+		}
+
+		if (limit != '') {
+			detailsquery =
+				'SELECT courses.*,rec_courses.course_name as rec_course_name,age_group.title as age_group_title from courses as courses LEFT JOIN age_group as age_group ON age_group.id = courses.age_group_id LEFT JOIN courses as rec_courses ON rec_courses.id = courses.recommended_course_id where courses.status !="2" ' +
+				Keyconditoin +
+				' LIMIT ' + start + ', ' + limit + '';
+		} else {
+			detailsquery =
+				'SELECT courses.*,rec_courses.course_name as rec_course_name,age_group.title as age_group_title from courses as courses LEFT JOIN age_group as age_group ON age_group.id = courses.age_group_id LEFT JOIN courses as rec_courses ON rec_courses.id = courses.recommended_course_id where courses.status !="2" ' +
+				Keyconditoin +
+				'';
+		}
+		var countquery = 'SELECT count(*) as count from courses WHERE courses.status !="2" ' +
+			Keyconditoin +
+			'';
+
+
+		console.log('detailsquery', detailsquery);
+
+		connection.query(countquery, function (err, responsecount) {
+			if (responsecount[0].count > 0) {
+				connection.query(detailsquery, function (errSelDetails, resSelDetails) {
+					if (errSelDetails) {
+						resultJson = '{"replyCode":"error","replyMsg":"' + errSelDetails.message + '","cmd":"courses_list"}\n';
+						connection.release();
+						callback(200, null, resultJson);
+						return;
+					} else {
+						resultJson =
+							'{"replyCode":"success","replyMsg":"Details found successfully .","data":' +
+							JSON.stringify(resSelDetails) +
+							',"totalCount":' + responsecount[0].count + ',"cmd":"courses_list"}\n';
+						console.log('res-suceess');
+						connection.release();
+						callback(200, null, resultJson);
+						return;
+					}
+				});
+			} else {
+				resultJson = '{"replyCode":"success","replyMsg":"courses_list","data":[], "cmd":"courses_list"}\n';
+				console.log(resultJson);
+				connection.release();
+				callback(200, null, resultJson);
+				return;
+			}
+		});
+
+
 	});
 }
 
@@ -6548,6 +6694,7 @@ function update_course_info_status(userdata, pool, callback) {
 
 	pool.getConnection(function (err, connection) {
 		Uquery = 'UPDATE course_info SET status="' + status + '" WHERE id = ' + id + '';
+		console.log('Uquery', Uquery);
 		connection.query(Uquery, function (errinsert) {
 			if (!errinsert) {
 				resultJson = '{"replyCode":"success","replyMsg":"Status chenged Successfully","cmd":"course_infos"}';
@@ -14028,6 +14175,564 @@ function link_setting_details(userdata, pool, callback) {
 				resultJson = '{"replyCode":"error","replyMsg":"' + errinsert.message + '","cmd":"link_setting_details"}\n';
 				connection.release();
 				callback(200, null, resultJson);
+				return;
+			}
+		});
+	});
+}
+
+
+/* user List */
+function user_list(userdata, pool, callback) {
+	var resultJson = '';
+	var strJson = '';
+	var keyword = '';
+	var role_id = '3';
+	var learning = '';
+	var school_code = '';
+	var Keyconditoin = ' users.status !="2" ';
+	var result = [];
+	var start = '0';
+	var limit = '';
+	var subscribed = '';
+	if (typeof userdata.keyword != 'undefined' && userdata.keyword != '') {
+		keyword = userdata.keyword;
+	}
+	if (typeof userdata.role_id != 'undefined' && userdata.role_id != '') {
+		role_id = userdata.role_id;
+	}
+	if (typeof userdata.learning != 'undefined' && userdata.learning != '') {
+		learning = userdata.learning;
+	}
+
+	if (typeof userdata.school_code != 'undefined' && userdata.school_code != '') {
+		school_code = userdata.school_code;
+	}
+
+	if (typeof userdata.start != 'undefined' && userdata.start != '') {
+		start = userdata.start;
+	}
+	if (typeof userdata.limit != 'undefined' && userdata.limit != '') {
+		limit = userdata.limit;
+	}
+
+	if (typeof userdata.subscribed != 'undefined' && userdata.subscribed != '') {
+		subscribed = userdata.subscribed;
+	}
+
+	pool.getConnection(function (err, connection) {
+		if (keyword != '') {
+			Keyconditoin += ' AND users.name LIKE  "%' + keyword + '%"';
+		}
+
+		if (role_id != '') {
+			Keyconditoin += ' AND users.role_id ="' + role_id + '"';
+		}
+
+		if (learning != '') {
+			Keyconditoin += ' AND users.learning ="' + learning + '"';
+		}
+		if (school_code != '') {
+			Keyconditoin += ' AND users.school_code ="' + school_code + '"';
+		}
+		if (subscribed != '') {
+			if (subscribed == '0') {
+				Keyconditoin += ' AND (SELECT COUNT(id) from student_course_subscription where student_course_subscription.student_id=users.id AND student_course_subscription.status="1") =0';
+			} else {
+				Keyconditoin += ' AND (SELECT COUNT(id) from student_course_subscription where student_course_subscription.student_id=users.id AND student_course_subscription.status="1") >=1';
+
+			}
+		}
+
+		if (limit != '') {
+			var Catquery = 'SELECT users.*,(SELECT COUNT(id) from student_course_subscription where student_course_subscription.student_id=users.id AND student_course_subscription.status="1") as subscribed,age_group.title FROM users LEFT JOIN age_group as age_group ON age_group.id = users.age_group_id  WHERE  ' + Keyconditoin + ' ORDER BY users.id DESC LIMIT ' + start + ', ' + limit + '';
+		} else {
+			var Catquery = 'SELECT users.*,(SELECT COUNT(id) from student_course_subscription where student_course_subscription.student_id=users.id AND student_course_subscription.status="1") as subscribed,age_group.title FROM users LEFT JOIN age_group as age_group ON age_group.id = users.age_group_id  WHERE  ' + Keyconditoin + ' ORDER BY users.id DESC';
+		}
+
+		console.log('Catquery', Catquery);
+
+		var countquery = 'SELECT count(*) as count from users WHERE ' + Keyconditoin + '';
+		// console.log('countquery::::::::::::::::----------',countquery)
+		connection.query(countquery, function (err, responsecount) {
+			// console.log('responsecount::::::::::::::::----------',responsecount)
+			if (responsecount && responsecount[0].count > 0) {
+				connection.query(Catquery, function (err, result) {
+					if (err) {
+						resultJson = '{"replyCode":"error","replyMsg":"' + err.message + '","cmd":"user_list"}\n';
+						connection.release();
+						callback(200, null, resultJson);
+						return;
+					} else {
+
+						if (result.length > 0) {
+							var i = 0;
+							async.eachSeries(
+								result,
+								function (rec2, loop2) {
+									var teacher_id = rec2.id;
+									console.log('teacher_id', teacher_id);
+									proiMGquery = 'SELECT teachers_grades.*,grades.grade_name FROM teachers_grades LEFT JOIN grades as grades ON grades.id = teachers_grades.grade_id WHERE teachers_grades.teacher_id = ' + teacher_id + '';
+									console.log('proiMGquery', proiMGquery);
+									connection.query(proiMGquery, function (errSelpiMG, respROiMG) {
+										if (errSelpiMG) {
+											console.log('errSelpiMG', errSelpiMG);
+
+											loop2();
+										} else {
+											if (respROiMG.length > 0) {
+												result[i].grades = respROiMG;
+											} else {
+												result[i].grades = [];
+											}
+											loop2();
+										}
+										i = i + 1;
+									});
+								},
+								function (errSelpiMG) {
+									if (errSelpiMG) {
+										console.log('errSelpiMG', errSelpiMG);
+										resultJson = '{"replyCode":"error","replyMsg":"' + errSelpiMG.message + '","cmd":"view_classes_info"}\n';
+										connection.release();
+										callback(200, null, resultJson);
+										return;
+									} else {
+										resultJson = '{"replyCode":"success","replyMsg":"User list","data":' + JSON.stringify(result) + ',"totalCount":' + responsecount[0].count + ', "cmd":"user_list"}\n';
+										console.log('res-suceess');
+										connection.release();
+										callback(200, null, resultJson);
+										return;
+									}
+								}
+							);
+						} else {
+							resultJson =
+								'{"replyCode":"success","replyMsg":"No Record found.","data":[], "cmd":"view_classes_info"}\n';
+							console.log('res-suceess');
+							connection.release();
+							callback(200, null, resultJson);
+							return;
+						}
+					}
+				});
+			} else {
+				resultJson = '{"replyCode":"success","replyMsg":"user_list","data":[], "cmd":"user_list"}\n';
+				console.log(resultJson);
+				connection.release();
+				callback(200, null, resultJson);
+				return;
+			}
+		});
+	});
+}
+
+
+
+function assign_course_to_student_bulk(userdata, pool, callback) {
+	var resultJson = '';
+	var student_id = '';
+	var teacher_id = '0';
+	var created_by = '';
+	var course_id = '';
+	var price = '0';
+	var students = '';
+	var new_account = '0';
+	var start_date = '';
+	var errArray = [];
+	if (typeof userdata.id != 'undefined' && userdata.id != '') {
+		id = userdata.id;
+	}
+	if (typeof userdata.course_id != 'undefined' && userdata.course_id != '') {
+		course_id = userdata.course_id;
+	}
+
+	if (typeof userdata.student_id != 'undefined' && userdata.student_id != '') {
+		student_id = userdata.student_id;
+	}
+	if (typeof userdata.teacher_id != 'undefined' && userdata.teacher_id != '') {
+		teacher_id = userdata.teacher_id;
+	}
+	if (typeof userdata.created_by != 'undefined' && userdata.created_by != '') {
+		created_by = userdata.created_by;
+	}
+	if (typeof userdata.price != 'undefined' && userdata.price != '') {
+		price = userdata.price;
+	}
+	if (typeof userdata.students != 'undefined' && userdata.students != '') {
+		students = userdata.students;
+	}
+
+	if (typeof userdata.new_account != 'undefined' && userdata.new_account != '') {
+		new_account = userdata.new_account;
+	}
+
+	if (typeof userdata.start_date != 'undefined' && userdata.start_date != '') {
+		start_date = userdata.start_date;
+	}
+
+	console.log('userData', userdata);
+
+	/* ESTABLISH CONNECTION TO DATABASE */
+	pool.getConnection(function (err, connection) {
+		if (student_id != '') {
+
+			subscribe_course(userdata, pool, function (ResSub, responseSubscribe) {
+				if (ResSub == false) {
+					resultJson = '{"replyCode":"error","replyMsg":"Something went wrong ","cmd":"subscribe_course"}\n';
+					console.log('res-suceess');
+					connection.release();
+					callback(200, null, resultJson);
+				} else {
+					resultJson = '{"replyCode":"success","replyMsg":"Course subscribed successfully","cmd":"subscribe_course"}\n';
+					console.log('res-suceess');
+					connection.release();
+					callback(200, null, resultJson);
+				}
+			})
+		} else {
+			var i = 0;
+			async.eachSeries(students, function (rec2, loop2) {
+				console.log('Student--', rec2);
+				checkValidateStudent(rec2, pool, function (ResStatus, responseResult) {
+					console.log(typeof responseResult);
+					console.log(ResStatus);
+					console.log(responseResult);
+
+					if (ResStatus == false) {
+						if (new_account == '1') {
+							console.log('123467');
+							register_user_fun(rec2, pool, function (resSub, responseSubscribe) {
+								if (resSub == false) {
+									resultJson = '{"replyCode":"error","replyMsg":"Something went wrong ","cmd":"register_user_fun"}\n';
+									console.log('res-suceess');
+									loop2();
+								} else {
+									console.log('responseSubscribe', responseSubscribe);
+									var querySelectCourse = 'SELECT class_duration_template.* from class_duration_template WHERE class_name="' + rec2.class_name + '" AND status="1"';
+									console.log('querySelectCourse--1', querySelectCourse);
+									connection.query(querySelectCourse, function (errSel, resSel) {
+										console.log('querySelectCourse--1::::resSel', resSel);
+										if (errSel) {
+											resultJson = '{"replyCode":"error","replyMsg":"' + errSel.message + '","cmd":"subscribe_course"}\n';
+											connection.release();
+											callback(false, resultJson);
+											return;
+										} else {
+											console.log(resSel);
+											if (resSel.length > 0) {
+												var i = 0;
+												var myDate = new Date(start_date);
+												console.log('myDate', myDate);
+												var courseDays = "0";
+												async.eachSeries(resSel, function (rec3, loop3) {
+													var course_id = rec3.course_id;
+													if (courseDays != "0") {
+														myDate.setDate(myDate.getDate() + courseDays);
+													}
+
+													NewSchDate = myDate.getFullYear() + "-" + parseInt(myDate.getMonth() + 1) + "-" + myDate.getDate();
+													console.log('NewSchDate---', NewSchDate);
+													var dataSUb = { "course_id": course_id, "student_id": responseSubscribe, "teacher_id": "0", "price": price, "start_date": NewSchDate, "transaction_id": "0" };
+													subscribe_course(dataSUb, pool, function (resNew, responseNew) {
+														if (resNew == false) {
+															courseDays = rec3.days;
+															resultJson = '{"replyCode":"error","replyMsg":"Something went wrong ","cmd":"subscribe_course-register_user_fun"}\n';
+															console.log('res-suceess');
+															loop3();
+														} else {
+															courseDays = rec3.days;
+															resultJson = '{"replyCode":"success","replyMsg":"Course subscribed successfully","cmd":"subscribe_course-register_user_fun"}\n';
+															loop3();
+														}
+													})
+												}, function (errSelPro) {
+													if (errSelPro) {
+														console.log('errSelPro', errSelPro);
+														resultJson = '{"replyCode":"error","replyMsg":"' + errSelPro.message + '","cmd":"teacher_schedule_days_list"}\n';
+														loop2();
+													} else {
+														resultJson = '{"replyCode":"success","replyMsg":"Details found successfully .","cmd":"teacher_schedule_days_list"}\n';
+														console.log('res-suceess');
+														loop2();
+													}
+												});
+											} else {
+
+												console.log('res-err',);
+												loop2();
+											}
+										}
+									})
+
+								}
+							})
+						} else {
+							if (new_account == '0') {
+								if (responseResult.length > 0) {
+									var student = responseResult[0].id;
+									var myDate = new Date(start_date);
+									NewSchDate = myDate.getFullYear() + "-" + parseInt(myDate.getMonth() + 1) + "-" + myDate.getDate();
+									console.log('NewSchDate---', NewSchDate);
+									var dataSUb = { "course_id": course_id, "student_id": student, "teacher_id": "0", "price": price, "transaction_id": "0", "start_date": NewSchDate };
+									// assign new course
+									subscribe_course(dataSUb, pool, function (resN, responseSubscribe) {
+										if (resN == false) {
+											resultJson = '{"replyCode":"error","replyMsg":"Something went wrong ","cmd":"subscribe_course"}\n';
+											console.log('res-suceess');
+											errArray.push(i + 1);
+
+											loop2();
+										} else {
+											resultJson = '{"replyCode":"success","replyMsg":"Course subscribed successfully","cmd":"subscribe_course"}\n';
+											console.log('res-suceess');
+											loop2();
+										}
+									})
+
+								} else {
+									errArray.push(i + 1);
+									loop2();
+								}
+							} else {
+								errArray.push(i + 1);
+								loop2();
+							}
+
+						}
+					} else {
+
+						console.log('fas gaya', responseResult.length);
+						if (responseResult.length > 0 && new_account == '0') {
+							var myDate = new Date(start_date);
+							NewSchDate = myDate.getFullYear() + "-" + parseInt(myDate.getMonth() + 1) + "-" + myDate.getDate();
+							console.log('NewSchDate---', NewSchDate);
+							var dataSUb = { "course_id": course_id, "student_id": responseResult[0].id, "teacher_id": "0", "price": price, "transaction_id": "0", "start_date": NewSchDate };
+							// assign new course
+							subscribe_course(dataSUb, pool, function (resN, responseSubscribe) {
+								if (resN == false) {
+									resultJson = '{"replyCode":"error","replyMsg":"Something went wrong ","cmd":"subscribe_course"}\n';
+									console.log('res-suceess');
+									errArray.push(i + 1);
+									loop2();
+								} else {
+									resultJson = '{"replyCode":"success","replyMsg":"Course subscribed successfully","cmd":"subscribe_course"}\n';
+									console.log('res-suceess');
+									loop2();
+								}
+							})
+						} else {
+							errArray.push(i + 1);
+							console.log('fas gaya');
+							loop2();
+						}
+					}
+					i = i + 1;
+				});
+			}, function (errSelPro) {
+				if (errSelPro) {
+					console.log('errSelPro', errSelPro);
+					resultJson = '{"replyCode":"error","replyMsg":"' + errSelPro.message + '","cmd":"teacher_schedule_days_list"}\n';
+					connection.release();
+					callback(200, null, resultJson);
+					return;
+				} else {
+					resultJson = '{"replyCode":"success","replyMsg":"Details found successfully .","data":"' + errArray + '","cmd":"teacher_schedule_days_list"}\n';
+					console.log('res-suceess');
+					connection.release();
+					callback(200, null, resultJson);
+					return;
+				}
+			});
+		}
+
+	});
+}
+
+
+function school_grades_list(userdata, pool, callback) {
+	var resultJson = '';
+	var school_id = '';
+
+	if (typeof userdata.school_id != 'undefined' && userdata.school_id != '') {
+		school_id = userdata.school_id;
+	}
+	console.log('----------');
+	console.log(userdata);
+
+	pool.getConnection(function (err, connection) {
+		var Catquery = 'SELECT school_grades.* from school_grades WHERE school_grades.school_id="' + school_id + '" ';
+		console.log('Catquery', Catquery);
+		connection.query(Catquery, function (errContent, resContent) {
+			if (errContent) {
+				resultJson = '{"replyCode":"error","replyMsg":"' + errContent.message + '","cmd":"school_grades_list"}\n';
+				connection.release();
+				callback(200, null, resultJson);
+				return;
+			} else {
+				resultJson = '{"replyCode":"success","replyMsg":"school grades fetched successfully","cmd":"school_grades_list","data":' + JSON.stringify(resContent) + '}\n';
+				console.log('res-suceess');
+				connection.release();
+				callback(200, null, resultJson);
+				return;
+
+			}
+
+		});
+	});
+}
+
+
+function admin_school_generated_payout_list(userdata, pool, callback) {
+	var resultJson = '';
+	var school_id = '';
+	var from_date = '';
+	var to_date = '';
+	var Keyconditoin = '';
+	// var learning = '0';
+	if (typeof userdata.learning != 'undefined' && userdata.learning != '') {
+		learning = userdata.learning;
+	}
+
+	if (typeof userdata.school_id != 'undefined' && userdata.school_id != '') {
+		school_id = userdata.school_id;
+	}
+	if (typeof userdata.from_date != 'undefined' && userdata.from_date != '') {
+		from_date = userdata.from_date;
+	}
+
+	if (typeof userdata.to_date != 'undefined' && userdata.to_date != '') {
+		to_date = userdata.to_date;
+	}
+	pool.getConnection(function (err, connection) {
+		if (school_id != '') {
+			Keyconditoin += ' AND school_generated_payouts.school_id ="' + school_id + '"';
+		}
+		if (from_date != '') {
+			Keyconditoin += ' AND school_generated_payouts.created >="' + from_date + '" ';
+		}
+		if (to_date != '') {
+			Keyconditoin += ' AND school_generated_payouts.created <="' + to_date + '" ';
+		}
+		// if (learning != '') {
+		// 	Keyconditoin = ' AND school_generated_payouts.learning LIKE  "' + learning + '"';
+		// }
+		detailsquery = 'SELECT school_generated_payouts.*,schools.name,schools.code,schools.city,schools.state,schools.contact_person,schools.contact_phone,schools.contact_email from school_generated_payouts LEFT JOIN schools as schools ON schools.id = school_generated_payouts.school_id  where school_generated_payouts.status !="2" ' + Keyconditoin + ' ORDER BY school_generated_payouts.created DESC';
+		console.log('detailsquery', detailsquery);
+		connection.query(detailsquery, function (errSelDetails, resSelDetails) {
+			if (errSelDetails) {
+				resultJson =
+					'{"replyCode":"error","replyMsg":"' + errSelDetails.message + '","cmd":"school_generated_payouts_list"}\n';
+				connection.release();
+				callback(200, null, resultJson);
+				return;
+			} else {
+				resultJson =
+					'{"replyCode":"success","replyMsg":"Details found successfully .","data":' +
+					JSON.stringify(resSelDetails) + ',"cmd":"school_generated_payouts_list"}\n';
+				console.log('res-suceess');
+				connection.release();
+				callback(200, null, resultJson);
+				return;
+			}
+		});
+	});
+}
+
+
+/* badge list */
+function badges_list(userdata, pool, callback) {
+	var resultJson = '';
+	var strJson = '';
+	var keyword = '';
+	var is_admin = '1';
+
+	if (typeof userdata.keyword != 'undefined' && userdata.keyword != '') {
+		keyword = userdata.keyword;
+	}
+	if (typeof userdata.is_admin != 'undefined' && userdata.is_admin != '') {
+		is_admin = userdata.is_admin;
+	}
+
+	pool.getConnection(function (err, connection) {
+		if (is_admin == '0') {
+			var Catquery = 'SELECT badges.* FROM badges WHERE badges.status ="1" ORDER BY badges.id DESC';
+
+		} else {
+			var Catquery = 'SELECT badges.* FROM badges WHERE badges.status !="2" ORDER BY badges.id DESC';
+
+		}
+
+		connection.query(Catquery, function (err, result) {
+			if (err) {
+				resultJson = '{"replyCode":"error","replyMsg":"' + err.message + '","cmd":"sub_admin_list"}\n';
+				connection.release();
+				callback(200, null, resultJson);
+				return;
+			} else {
+				resultJson =
+					'{"replyCode":"success","replyMsg":"badge list","data":' + JSON.stringify(result) +
+					', "cmd":"sub_admin_list"}\n';
+				console.log('res-suceess');
+				connection.release();
+				callback(200, null, resultJson);
+				return;
+			}
+		});
+	});
+}
+
+
+// assign course to atudent
+
+function assign_course_to_student(userdata, pool, callback) {
+	var resultJson = '';
+	var course_id = '';
+	var student_id = '';
+	var teacher_id = '1';
+	var price = '0';
+	var created_by = '';
+	var id = '';
+
+	if (typeof userdata.id != 'undefined' && userdata.id != '') {
+		id = userdata.id;
+	}
+	if (typeof userdata.course_id != 'undefined' && userdata.course_id != '') {
+		course_id = userdata.course_id;
+	}
+
+	if (typeof userdata.student_id != 'undefined' && userdata.student_id != '') {
+		student_id = userdata.student_id;
+	}
+	if (typeof userdata.teacher_id != 'undefined' && userdata.teacher_id != '') {
+		teacher_id = userdata.teacher_id;
+	}
+	if (typeof userdata.created_by != 'undefined' && userdata.created_by != '') {
+		created_by = userdata.created_by;
+	}
+	if (typeof userdata.price != 'undefined' && userdata.price != '') {
+		price = userdata.price;
+	}
+
+	/* ESTABLISH CONNECTION TO DATABASE */
+	pool.getConnection(function (err, connection) {
+		if (id != '') {
+			var queryinsert = 'UPDATE student_course_subscription SET course_id="' + course_id + '",student_id="' + student_id + '",teacher_id="' + teacher_id + '",price="' + price + '",created_by="' + created_by + '" where student_course_subscription.id="' + id + '"';
+		} else {
+			var queryinsert = 'INSERT INTO student_course_subscription SET course_id="' + course_id + '",student_id="' + student_id + '",teacher_id="' + teacher_id + '",price="' + price + '",created_by="' + created_by + '",created= NOW()';
+		}
+		console.log(queryinsert);
+		connection.query(queryinsert, function (errinsert, resultinsert) {
+			if (!errinsert) {
+				resultJson = '{"replyCode":"success","replyMsg":"courses updated successfully","cmd":"student_course_subscription"}\n';
+				connection.release();
+				callback(200, null, resultJson);
+				return;
+			} else {
+				resultJson = '{"replyCode":"error","replyMsg":"' + errinsert.message + '","cmd":"student_course_subscription"}\n';
+				console.log('res-suceess');
+				connection.release();
+				callback(400, null, resultJson);
 				return;
 			}
 		});

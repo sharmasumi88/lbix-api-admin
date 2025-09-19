@@ -4,6 +4,7 @@ var fs                      = require('fs-extra'),
     PORT                    = config.port,
     Users                   = require('./users.js'),
     Admin                   = require('./admin.js'),
+    Blog                    = require('./blogs.js'),
     async                   = require("async");
     https                   = require("https");
 
@@ -4158,6 +4159,7 @@ app.post('/add_school_grade', function (req, res) {
 });
 
 
+
 app.post('/overall_details_student', function (req, res) {
     var userdata = req.body;
     Users.overall_details_student(userdata, pool, function (http_status_code, err, response) {
@@ -4456,6 +4458,308 @@ app.post('/link_setting_details', function (req, res) {
     });
 });
 
+//Left
 
+
+app.post('/user_list', function (req, res) {
+    var userdata = req.body;
+    Admin.user_list(userdata, pool, function (http_status_code, err, response) {
+        if (err) {
+            console.log(err);
+            throw err;
+        }
+        if (config.DEBUG == 2)
+            console.log(response);
+            res.status(http_status_code).send(response);
+    });
+});
+
+app.post('/courses_list', function (req, res) {
+    var userdata = req.body;
+    Admin.courses_list(userdata, pool, function (http_status_code, err, response) {
+        if (err) {
+            console.log(err);
+            throw err;
+        }
+        if (config.DEBUG == 2)
+            console.log(response);
+            res.status(http_status_code).send(response);
+    });
+});
+
+
+
+app.post('/assign_course_to_student', function (req, res) {
+    var userdata = req.body;
+    Admin.assign_course_to_student(userdata, pool, function (http_status_code, err, response) {
+        if (err) {
+            console.log(err);
+            throw err;
+        }
+        if (config.DEBUG == 2)
+            console.log(response);
+            res.status(http_status_code).send(response);
+    });
+});
+
+
+app.post('/assign_course_to_student_bulk', function (req, res) {
+    var userdata = req.body;
+    Admin.assign_course_to_student_bulk(userdata, pool, function (http_status_code, err, response) {
+        if (err) {
+            console.log(err);
+            throw err;
+        }
+        if (config.DEBUG == 2)
+            console.log(response);
+            res.status(http_status_code).send(response);
+    });
+});
+
+
+app.post('/faqs_list', function (req, res) {
+    var userdata = req.body;
+    Admin.faqs_list(userdata, pool, function (http_status_code, err, response) {
+        if (err) {
+            console.log(err);
+            throw err;
+        }
+        if (config.DEBUG == 2)
+            console.log(response);
+            res.status(http_status_code).send(response);
+    });
+});
+
+
+app.post('/school_grades_list', function (req, res) {
+    var userdata = req.body;
+    Admin.school_grades_list(userdata, pool, function (http_status_code, err, response) {
+        if (err) {
+			console.log(err);
+            throw err;
+        }
+        if (config.DEBUG == 2)
+            console.log(response);
+            res.status(http_status_code).send(response);
+    });
+});
+
+app.post('/overall_details_teacher', function (req, res) {
+    var userdata = req.body;
+    Users.overall_details_teacher(userdata, pool, function (http_status_code, err, response) {
+        if (err) {
+			console.log(err);
+            throw err;
+        }
+        if (config.DEBUG == 2)
+            console.log(response);
+            res.status(http_status_code).send(response);
+    });
+});
+
+app.post('/badges_list', function (req, res) {
+    var userdata = req.body;
+    Admin.badges_list(userdata, pool, function (http_status_code, err, response) {
+        if (err) {
+			console.log(err);
+            throw err;
+        }
+        if (config.DEBUG == 2)
+            console.log(response);
+            res.status(http_status_code).send(response);
+    });
+});
+
+
+app.post('/grades_list', function (req, res) {
+    var userdata = req.body;
+    Users.grades_list(userdata, pool, function (http_status_code, err, response) {
+        if (err) {
+			console.log(err);
+            throw err;
+        }
+        if (config.DEBUG == 2)
+            console.log(response);
+            res.status(http_status_code).send(response);
+    });
+});
+
+app.post('/school_user_list',function (req, res) {
+    var userdata = req.body;
+    Users.school_user_list(userdata, pool, function (http_status_code, err, response) {
+        if (err) {
+			console.log(err);
+            throw err;
+        }else{
+           // client.flushall('ASYNC');
+           //redis-cli flushall
+            console.log(response);
+           // client.setex('schoolData',3600,JSON.stringify(response));
+            res.status(http_status_code).send(response);
+        }
+    });
+});
+
+
+app.post('/reviews_list', function (req, res) {
+    var userdata = req.body;
+    Users.reviews_list(userdata, pool, function (http_status_code, err, response) {
+        if (err) {
+            console.log(err);
+            throw err;
+        }
+        if (config.DEBUG == 2)
+            console.log(response);
+            res.status(http_status_code).send(response);
+    });
+});
+
+
+app.post('/blog_category_list', function (req, res) {
+    var userdata = req.body;
+    Blog.blog_category_list(userdata, pool, function (http_status_code, err, response) {
+        if (err) {
+            console.log(err);
+            throw err;
+        }
+        if (config.DEBUG == 2)
+            console.log(response);
+            res.status(http_status_code).send(response);
+    });
+});
+
+
+app.post('/blog_category_dropdown_list', function (req, res) {
+    var userdata = req.body;
+    Blog.blog_category_dropdown_list(userdata, pool, function (http_status_code, err, response) {
+        if (err) {
+            console.log(err);
+            throw err;
+        }
+        if (config.DEBUG == 2)
+            console.log(response);
+            res.status(http_status_code).send(response);
+    });
+});
+
+app.post('/web_blog_category_list', function (req, res) {
+    var userdata = req.body;
+    Blog.web_blog_category_list(userdata, pool, function (http_status_code, err, response) {
+        if (err) {
+            console.log(err);
+            throw err;
+        }
+        if (config.DEBUG == 2)
+            console.log(response);
+            res.status(http_status_code).send(response);
+    });
+});
+
+
+app.post('/add_blog_category', function (req, res) {
+    var userdata = req.body;
+    Blog.add_blog_category(userdata, pool, function (http_status_code, err, response) {
+        if (err) {
+            console.log(err);
+            throw err;
+        }
+        if (config.DEBUG == 2)
+            console.log(response);
+            res.status(http_status_code).send(response);
+    });
+});
+
+
+app.post('/blog_category_details', function (req, res) {
+    var userdata = req.body;
+    Blog.blog_category_details(userdata, pool, function (http_status_code, err, response) {
+        if (err) {
+            console.log(err);
+            throw err;
+        }
+        if (config.DEBUG == 2)
+            console.log(response);
+            res.status(http_status_code).send(response);
+    });
+});
+
+
+app.post('/update_blog_category_status', function (req, res) {
+    var userdata = req.body;
+    Blog.update_blog_category_status(userdata, pool, function (http_status_code, err, response) {
+        if (err) {
+            console.log(err);
+            throw err;
+        }
+        if (config.DEBUG == 2)
+            console.log(response);
+            res.status(http_status_code).send(response);
+    });
+});
+
+app.post('/add_blog', function (req, res) {
+    var userdata = req.body;
+    Blog.add_blog(userdata, pool, function (http_status_code, err, response) {
+        if (err) {
+            console.log(err);
+            throw err;
+        }
+        if (config.DEBUG == 2)
+            console.log(response);
+            res.status(http_status_code).send(response);
+    });
+});
+
+app.post('/blog_admin_list', function (req, res) {
+    var userdata = req.body;
+    Blog.blog_admin_list(userdata, pool, function (http_status_code, err, response) {
+        if (err) {
+            console.log(err);
+            throw err;
+        }
+        if (config.DEBUG == 2)
+            console.log(response);
+            res.status(http_status_code).send(response);
+    });
+});
+
+app.post('/blog_web_list', function (req, res) {
+    var userdata = req.body;
+    Blog.blog_web_list(userdata, pool, function (http_status_code, err, response) {
+        if (err) {
+            console.log(err);
+            throw err;
+        }
+        if (config.DEBUG == 2)
+            console.log(response);
+            res.status(http_status_code).send(response);
+    });
+});
+
+app.post('/update_blog_status', function (req, res) {
+    var userdata = req.body;
+    Blog.update_blog_status(userdata, pool, function (http_status_code, err, response) {
+        if (err) {
+            console.log(err);
+            throw err;
+        }
+        if (config.DEBUG == 2)
+            console.log(response);
+            res.status(http_status_code).send(response);
+    });
+});
+
+app.post('/blog_view', function (req, res) {
+    var userdata = req.body;
+    Blog.blog_view(userdata, pool, function (http_status_code, err, response) {
+        if (err) {
+            console.log(err);
+            throw err;
+        }
+        if (config.DEBUG == 2)
+            console.log(response);
+            res.status(http_status_code).send(response);
+    });
+});
 
 module.exports = app;
