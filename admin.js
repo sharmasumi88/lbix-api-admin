@@ -14738,3 +14738,89 @@ function assign_course_to_student(userdata, pool, callback) {
 		});
 	});
 }
+
+
+
+function login(userdata, pool, callback) {
+	var resultJson = '';
+	var strJson = '';
+	var sha1 = require('sha1');
+	var Hashids = require("hashids"), hashids = new Hashids(secretSalt);
+	
+	var phone = '';
+	var email = '';
+	var role_id = '1';
+	var password='';
+
+	if (typeof userdata.phone != 'undefined' && userdata.phone != '') {
+		phone = userdata.phone;
+	}
+	
+	if (typeof userdata.email != 'undefined' && userdata.email != '') {
+		email = userdata.email;
+	}
+
+	if (typeof userdata.role_id != 'undefined' && userdata.role_id != '') {
+		role_id = userdata.role_id;
+	}
+	
+	console.log('userdata',userdata)
+	pool.getConnection(function (err, connection) {
+		var hash_password = sha1(secretSalt + userdata.password);
+		
+		squery ='SELECT users.*,age_group.title FROM users LEFT JOIN age_group as age_group ON age_group.id = users.age_group_id WHERE users.email="' + email + '" AND users.password="' + hash_password + '" AND users.email !="" AND users.role_id="'+role_id+'"';
+		console.log('ss',squery)
+		connection.query(squery, function (err, results) {
+			if (!err)
+			{
+				if(results.length > 0){
+					if(results[0].status != 1){
+						resultJson = '{"replyCode":"error","replyMsg":"You are not Authorized","cmd":"login"}\n';
+						connection.release();
+						callback(200, null, resultJson);
+						return;
+					}else{
+						var sid = hashids.encode(results[0].id);
+						
+						var dataResult = results[0];
+						console.log('-------------------');
+						console.log(dataResult);
+						var dataResult = results[0];
+						console.log('-------------------');
+						console.log(dataResult);
+						connection.query('SELECT deviceToken FROM users WHERE deviceToken="'+userdata.deviceToken+'"', function(errs, device){
+							if(!errs){
+								if(device.length > 0){
+									connection.query('UPDATE users SET deviceToken=""  WHERE deviceToken="' + userdata.deviceToken +'"', function(errs, done){
+										if(!errs){
+											connection.query('UPDATE users SET deviceToken="' + userdata.deviceToken + '" WHERE id="' + dataResult.id + '" ');
+										}
+									});
+								}else{
+									connection.query('UPDATE users SET deviceToken="' + userdata.deviceToken + '" WHERE id="' + dataResult.id + '" ');
+								}
+							}
+						});
+					
+						results[0].deviceToken=	userdata.deviceToken;
+						resultJson = '{"replyCode":"success","replyMsg": "success", "data":'+ JSON.stringify(results[0]) +',"sid":"'+sid+'","cmd":"login"}\n';
+						connection.release();
+						callback(200, null, resultJson);
+						return;		
+					}
+				}else{
+					resultJson = '{"replyCode":"error","replyMsg":"Please check your login credentials.","cmd":"login"}\n';
+					connection.release();
+					callback(200, null, resultJson);
+					return;
+				}
+			}else{
+				
+				resultJson = '{"replyCode":"error","replyMsg":"' + err.message + '","cmd":"login"}\n';
+				connection.release();
+				callback(400, null, resultJson);
+				return;
+			}
+		});
+	});
+}
