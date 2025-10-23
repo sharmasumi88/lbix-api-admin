@@ -14,6 +14,7 @@ var nodemailer = require('nodemailer');
 
 //Admin
 module.exports.admin_login = admin_login;
+module.exports.login = login;
 module.exports.admin_change_password = admin_change_password;
 module.exports.update_admin_profile = update_admin_profile;
 
