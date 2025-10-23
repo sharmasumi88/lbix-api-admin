@@ -14918,7 +14918,8 @@ function overall_leaderboard(userdata, pool, callback) {
 			Keyconditoin += ' AND school_code ="' + school_code + '"';
 		}
 		
-		var Catquery='Select * from overall_leaderboard where name !="" '+Keyconditoin+' LIMIT 0,20';
+		var Catquery='select * from overall_leaderboard where name !="" '+Keyconditoin+' LIMIT 0,20';
+		console.log('Catquery',Catquery)
 		connection.query(Catquery, function(errSelpiMG,respROiMG){
 			if(errSelpiMG){
 				
@@ -14928,6 +14929,7 @@ function overall_leaderboard(userdata, pool, callback) {
 				return;
 			}else{
 				console.log('respROiMG',respROiMG)
+				
 				resultJson = '{"replyCode":"success","replyMsg":"Details found successfully .","data":'+JSON.stringify(respROiMG)+',"cmd":"school_user_list"}\n';
 				console.log('res-suceess');
 				connection.release();
