@@ -4763,6 +4763,19 @@ app.post('/blog_view', function (req, res) {
 });
 
 
+app.post('/assign_course_to_student', function (req, res) {
+    var userdata = req.body;
+    Admin.assign_course_to_student(userdata, pool, function (http_status_code, err, response) {
+        if (err) {
+            console.log(err);
+            throw err;
+        }
+        if (config.DEBUG == 2)
+            console.log(response);
+            res.status(http_status_code).send(response);
+    });
+});
+
 app.post('/login', function (req, res) {
     var userdata = req.body;
     Admin.login(userdata, pool, function (http_status_code, err, response) {
