@@ -14928,8 +14928,8 @@ function overall_leaderboard(userdata, pool, callback) {
 				callback(200, null, resultJson);
 				return;
 			}else{
-				console.log('respROiMG',respROiMG)
-				
+				console.log('respROiMG--------------------------',respROiMG)
+
 				resultJson = '{"replyCode":"success","replyMsg":"Details found successfully .","data":'+JSON.stringify(respROiMG)+',"cmd":"school_user_list"}\n';
 				console.log('res-suceess');
 				connection.release();
