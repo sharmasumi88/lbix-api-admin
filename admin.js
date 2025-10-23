@@ -14906,39 +14906,59 @@ function student_course_summary_track(userdata, pool, callback){
 
 /* user List */
 function overall_leaderboard(userdata, pool, callback) {
-	var resultJson = '';
-	var school_code='';
-	var Keyconditoin=' AND role_id="2"';
-	console.log('userdata',userdata)
-	if (typeof userdata.school_code  != 'undefined' && userdata.school_code  != '') {
-		school_code  = userdata.school_code ;
-	}
-	pool.getConnection(function (err, connection) {
-		if (school_code != '') {
-			Keyconditoin += ' AND school_code ="' + school_code + '"';
-		}
-		
-		var Catquery='select * from overall_leaderboard where name !="" '+Keyconditoin+' LIMIT 0,20';
-		console.log('Catquery',Catquery)
-		connection.query(Catquery, function(errSelpiMG,respROiMG){
-			if(errSelpiMG){
-				
-				resultJson = '{"replyCode":"error","replyMsg":"'+errSelpiMG.message+'","cmd":"school_user_list"}\n';
-				connection.release();
-				callback(200, null, resultJson);
-				return;
-			}else{
-				console.log('respROiMG--------------------------',respROiMG)
+  var called = false;
+  function done(statusCode, err, resultJson, conn) {
+    if (called) {
+      try { if (conn) conn.release(); } catch(e) {}
+      return;
+    }
+    called = true;
+    try { if (conn) conn.release(); } catch(e) {}
+    callback(statusCode, err, resultJson);
+  }
 
-				resultJson = '{"replyCode":"success","replyMsg":"Details found successfully .","data":'+JSON.stringify(respROiMG)+',"cmd":"school_user_list"}\n';
-				console.log('res-suceess');
-				connection.release();
-				callback(200, null, resultJson);
-				return;
-			}
-		});
-	});
+  var school_code = (userdata && userdata.school_code) ? String(userdata.school_code).trim() : '';
+  var params = ['2']; // role_id
+  var sql = 'SELECT * FROM overall_leaderboard WHERE role_id = ?';
+
+  if (school_code) {
+    sql += ' AND school_code = ?';
+    params.push(school_code);
+  }
+  sql += ' AND name != "" LIMIT 0,20';
+
+  pool.getConnection(function(err, connection) {
+    if (err) {
+      var resultJson = '{"replyCode":"error","replyMsg":"DB connection error","cmd":"school_user_list"}\n';
+      return done(500, null, resultJson, null);
+    }
+
+    // set a longer timeout to avoid client-side inactivity errors while we fix DB
+    var queryOpts = { sql: sql, timeout: 60000, values: params }; // 60s
+    console.log('overall_leaderboard query:', sql, params);
+
+    var start = Date.now();
+    connection.query(queryOpts, function(qErr, rows) {
+      var took = Date.now() - start;
+      console.log('overall_leaderboard query took (ms):', took);
+
+      if (qErr) {
+        console.error('overall_leaderboard query error', qErr);
+        var resultJson = '{"replyCode":"error","replyMsg":"' + (qErr.message || qErr) + '","cmd":"school_user_list"}\n';
+        return done(500, null, resultJson, connection);
+      }
+
+      var resultJson = '{"replyCode":"success","replyMsg":"Details found successfully .","data":' + JSON.stringify(rows) + ',"cmd":"school_user_list"}\n';
+      return done(200, null, resultJson, connection);
+    });
+
+    connection.on('error', function(connErr) {
+      console.error('connection async error', connErr);
+    });
+  });
 }
+
+
 
 
 
