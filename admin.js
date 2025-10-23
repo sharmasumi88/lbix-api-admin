@@ -330,6 +330,7 @@ module.exports.student_course_summary_track = student_course_summary_track;
 module.exports.overall_leaderboard = overall_leaderboard;
 
 module.exports.user_badges_point_list = user_badges_point_list;
+module.exports.doubts_list = doubts_list;
 
 
 var ToDate = new Date();
@@ -14834,129 +14835,240 @@ function login(userdata, pool, callback) {
 }
 
 
+const util = require('util');
 
-function student_course_summary_track(userdata, pool, callback){
-	var resultJson = '';
-	var student_id ='';
-	
-	if (typeof userdata.student_id != 'undefined' && userdata.student_id != ''){
-		student_id = userdata.student_id;
-	}
-	
-	console.log('----------');
-	console.log(userdata);
-	pool.getConnection(function (err, connection){
-		var Catquery='SELECT student_course_subscription.course_id,student_course_subscription.course_start_date,student_course_subscription.certificate_name,courses.course_name,courses.description,courses.image,courses.course_ppt,(SELECT SUM(total_points) from student_course_summary_points where student_course_summary_points.student_id ="'+student_id+'") as total_points  from student_course_subscription LEFT JOIN courses as courses ON courses.id = student_course_subscription.course_id WHERE  student_course_subscription.student_id="'+student_id+'"';
-		console.log('qq',Catquery)
-		connection.query(Catquery, function(errinsert, resPro){
-			if(!errinsert){
-				if(resPro.length >0){
-					var i = 0;
-					async.eachSeries(resPro,function(rec2, loop2){
-						var course_id = rec2.course_id;
-						console.log('course_id',course_id);
-						proiMGquery = 'SELECT course_chapters.*,(SELECT count(*) from chapter_lessons WHERE chapter_lessons.course_chapter_id=course_chapters.id AND chapter_lessons.status="1") as total_lessons,(SELECT count(*) from student_lessons_status WHERE student_lessons_status.student_id="'+student_id+'" AND student_lessons_status.chapter_id=course_chapters.id AND student_lessons_status.percentage >"90") + (SELECT count(*) from student_quizzes WHERE student_quizzes.student_id="'+student_id+'" AND student_quizzes.chapter_id=course_chapters.id AND student_quizzes.in_review ="2") +(SELECT count(*) from student_projects WHERE student_projects.student_id="'+student_id+'" AND student_projects.chapter_id=course_chapters.id AND student_projects.in_review ="1") as complete_lessons,(SELECT count(*) from student_quizzes WHERE student_quizzes.student_id="'+student_id+'" AND student_quizzes.chapter_id=course_chapters.id AND student_quizzes.in_review ="2") as completed_quizzes,(SELECT count(*) from student_quizzes WHERE student_quizzes.student_id="'+student_id+'" AND student_quizzes.chapter_id=course_chapters.id ) as total_quizzes,(SELECT count(*) from student_projects WHERE student_projects.student_id="'+student_id+'" AND student_projects.chapter_id=course_chapters.id AND student_projects.in_review ="1") as completed_projects,(SELECT count(*) from student_projects WHERE student_projects.student_id="'+student_id+'" AND student_projects.chapter_id=course_chapters.id AND student_projects.in_review ="1") as total_projects, round((((SELECT count(*) from student_lessons_status WHERE student_lessons_status.student_id="'+student_id+'" AND student_lessons_status.chapter_id=course_chapters.id AND student_lessons_status.percentage >"90") + (SELECT count(*) from student_quizzes WHERE student_quizzes.student_id="'+student_id+'" AND student_quizzes.chapter_id=course_chapters.id AND student_quizzes.in_review ="2") +(SELECT count(*) from student_projects WHERE student_projects.student_id="'+student_id+'" AND student_projects.chapter_id=course_chapters.id AND student_projects.in_review ="1") * 100) / (SELECT count(*) from chapter_lessons WHERE chapter_lessons.course_chapter_id=course_chapters.id AND chapter_lessons.status="1")), 0) AS percent,((((SELECT count(*) from student_lessons_status WHERE student_lessons_status.student_id="'+student_id+'" AND student_lessons_status.chapter_id=course_chapters.id AND student_lessons_status.percentage >"90") + (SELECT count(*) from student_quizzes WHERE student_quizzes.student_id="'+student_id+'" AND student_quizzes.chapter_id=course_chapters.id AND student_quizzes.in_review ="2") +(SELECT count(*) from student_projects WHERE student_projects.student_id="'+student_id+'" AND student_projects.chapter_id=course_chapters.id AND student_projects.in_review ="1") * (select points_settings.class_points from points_settings)) + ((SELECT count(*) from student_projects WHERE student_projects.student_id="'+student_id+'" AND student_projects.chapter_id=course_chapters.id AND student_projects.in_review ="1") * (select points_settings.project_points from points_settings points_settings))) + ((SELECT count(*) from student_projects WHERE student_projects.student_id="'+student_id+'" AND student_projects.chapter_id=course_chapters.id AND student_projects.in_review ="1") * (select points_settings.quiz_points from points_settings points_settings))) AS total_points from course_chapters where course_chapters.course_id="'+course_id+'" AND course_chapters.status="1" ORDER BY course_chapters.s_no ASC';
-						console.log('proiMGquery',proiMGquery);
-						connection.query(proiMGquery, function(errSelpiMG,respROiMG){
-							if(errSelpiMG){
-								console.log('errSelpiMG',errSelpiMG);
-								
-								loop2();
-							}else{
-								resPro[i].info=respROiMG;
-								loop2();
-							}
-							i=i+1;
-						});
-						
-					},function(errSelPro){
-						if(errSelPro){
-							console.log('errSelPro',errSelPro)
-							resultJson = '{"replyCode":"error","replyMsg":"'+errSelPro.message+'","cmd":"view_classes_info"}\n';
-							connection.release();
-							callback(200, null, resultJson);
-							return;
-						}else{
-							resultJson = '{"replyCode":"success","replyMsg":"Details found successfully .","data":'+JSON.stringify(resPro)+',"cmd":"view_classes_info"}\n';
-							console.log('res-suceess');
-							connection.release();
-							callback(200, null, resultJson);
-							return;
-						}
-					});
-				}else{
-					resultJson = '{"replyCode":"success","replyMsg":"No Record found.","data":[], "cmd":"view_classes_info"}\n';
-					console.log('res-suceess');
-					connection.release();
-					callback(200, null, resultJson);
-					return;
-				}
-			}else{
-				resultJson = '{"replyCode":"error","replyMsg":"' + errinsert.message + '","cmd":"view_classes_info"}\n';
-				connection.release();
-				callback(200, null, resultJson);
-				return;
-			}
-		});	
-	});
-}
+function student_course_summary_track(userdata, pool, callback) {
+  let resultJson = '';
+  const student_id = (userdata && userdata.student_id) ? String(userdata.student_id) : '';
 
-
-
-
-/* user List */
-function overall_leaderboard(userdata, pool, callback) {
-  var called = false;
-  function done(statusCode, err, resultJson, conn) {
-    if (called) {
-      try { if (conn) conn.release(); } catch(e) {}
-      return;
-    }
-    called = true;
-    try { if (conn) conn.release(); } catch(e) {}
-    callback(statusCode, err, resultJson);
+  if (!student_id) {
+    resultJson = '{"replyCode":"error","replyMsg":"student_id is required","cmd":"view_classes_info"}\n';
+    return callback(200, null, resultJson);
   }
 
-  var school_code = (userdata && userdata.school_code) ? String(userdata.school_code).trim() : '';
-  var params = ['2']; // role_id
-  var sql = 'SELECT * FROM overall_leaderboard WHERE role_id = ?';
-
-  if (school_code) {
-    sql += ' AND school_code = ?';
-    params.push(school_code);
-  }
-  sql += ' AND name != "" LIMIT 0,20';
-
-  pool.getConnection(function(err, connection) {
+  pool.getConnection(function (err, connection) {
     if (err) {
-      var resultJson = '{"replyCode":"error","replyMsg":"DB connection error","cmd":"school_user_list"}\n';
-      return done(500, null, resultJson, null);
+      resultJson = '{"replyCode":"error","replyMsg":"' + err.message + '","cmd":"view_classes_info"}\n';
+      return callback(200, null, resultJson);
     }
 
-    // set a longer timeout to avoid client-side inactivity errors while we fix DB
-    var queryOpts = { sql: sql, timeout: 60000, values: params }; // 60s
-    console.log('overall_leaderboard query:', sql, params);
+    // 1) Student’s courses
+    const sqlCourses = `
+      SELECT
+        scs.course_id,
+        scs.course_start_date,
+        scs.certificate_name,
+        c.course_name,
+        c.description,
+        c.image,
+        c.course_ppt
+      FROM student_course_subscription scs
+      JOIN courses c ON c.id = scs.course_id
+      WHERE scs.student_id = ?
+    `;
 
-    var start = Date.now();
-    connection.query(queryOpts, function(qErr, rows) {
-      var took = Date.now() - start;
-      console.log('overall_leaderboard query took (ms):', took);
-
-      if (qErr) {
-        console.error('overall_leaderboard query error', qErr);
-        var resultJson = '{"replyCode":"error","replyMsg":"' + (qErr.message || qErr) + '","cmd":"school_user_list"}\n';
-        return done(500, null, resultJson, connection);
+    connection.query(sqlCourses, [student_id], function (errCourses, courses) {
+      if (errCourses) {
+        connection.release();
+        resultJson = '{"replyCode":"error","replyMsg":"' + errCourses.message + '","cmd":"view_classes_info"}\n';
+        return callback(200, null, resultJson);
       }
 
-      var resultJson = '{"replyCode":"success","replyMsg":"Details found successfully .","data":' + JSON.stringify(rows) + ',"cmd":"school_user_list"}\n';
-      return done(200, null, resultJson, connection);
-    });
+      if (!courses || courses.length === 0) {
+        connection.release();
+        resultJson = '{"replyCode":"success","replyMsg":"No Record found.","data":[],"cmd":"view_classes_info"}\n';
+        return callback(200, null, resultJson);
+      }
 
-    connection.on('error', function(connErr) {
-      console.error('connection async error', connErr);
+      // 2) Total points once
+      const sqlTotalPts = `
+        SELECT COALESCE(SUM(total_points), 0) AS total_points
+        FROM student_course_summary_points
+        WHERE student_id = ?
+      `;
+      connection.query(sqlTotalPts, [student_id], function (errTP, tpRows) {
+        if (errTP) {
+          connection.release();
+          resultJson = '{"replyCode":"error","replyMsg":"' + errTP.message + '","cmd":"view_classes_info"}\n';
+          return callback(200, null, resultJson);
+        }
+
+        const grandTotalPoints = (tpRows && tpRows[0] && tpRows[0].total_points) ? tpRows[0].total_points : 0;
+
+        // 3) All chapter stats for all courses (single query)
+        const courseIds = courses.map(r => r.course_id);
+        const placeholders = courseIds.map(() => '?').join(',');
+
+        if (!placeholders) {
+          // Shouldn’t happen, but just in case
+          connection.release();
+          const data = courses.map(c => ({ ...c, total_points: grandTotalPoints, info: [] }));
+          resultJson = JSON.stringify({
+            replyCode: 'success',
+            replyMsg: 'Details found successfully.',
+            data,
+            cmd: 'view_classes_info'
+          }) + '\n';
+          return callback(200, null, resultJson);
+        }
+
+        const sqlChapters = `
+          SELECT
+            cc.*,
+            cc.course_id,
+
+            COUNT(DISTINCT CASE WHEN cl.status = 1 THEN cl.id END) AS total_lessons,
+
+            SUM(CASE WHEN sls.student_id = ? AND sls.percentage > 90 THEN 1 ELSE 0 END) AS completed_lessons,
+            SUM(CASE WHEN sq.student_id = ? AND sq.in_review = 2 THEN 1 ELSE 0 END) AS completed_quizzes,
+            COUNT(CASE WHEN sq.student_id = ? THEN 1 END)                                        AS total_quizzes,
+            SUM(CASE WHEN sp.student_id = ? AND sp.in_review = 1 THEN 1 ELSE 0 END)             AS completed_projects,
+            COUNT(CASE WHEN sp.student_id = ? THEN 1 END)                                        AS total_projects,
+
+            ROUND((
+              (
+                SUM(CASE WHEN sls.student_id = ? AND sls.percentage > 90 THEN 1 ELSE 0 END) +
+                SUM(CASE WHEN sq.student_id = ? AND sq.in_review = 2 THEN 1 ELSE 0 END) +
+                SUM(CASE WHEN sp.student_id = ? AND sp.in_review = 1 THEN 1 ELSE 0 END)
+              ) * 100
+            ) / NULLIF(COUNT(DISTINCT CASE WHEN cl.status = 1 THEN cl.id END), 0), 0) AS percent,
+
+            (
+              (SUM(CASE WHEN sls.student_id = ? AND sls.percentage > 90 THEN 1 ELSE 0 END) * p.class_points) +
+              (SUM(CASE WHEN sp.student_id = ? AND sp.in_review = 1 THEN 1 ELSE 0 END) * p.project_points) +
+              (SUM(CASE WHEN sq.student_id = ? AND sq.in_review = 2 THEN 1 ELSE 0 END) * p.quiz_points)
+            ) AS total_points
+
+          FROM course_chapters cc
+          LEFT JOIN chapter_lessons cl
+            ON cl.course_chapter_id = cc.id AND cl.status = 1
+          LEFT JOIN student_lessons_status sls
+            ON sls.chapter_id = cc.id
+          LEFT JOIN student_quizzes sq
+            ON sq.chapter_id = cc.id
+          LEFT JOIN student_projects sp
+            ON sp.chapter_id = cc.id
+          JOIN (SELECT class_points, project_points, quiz_points FROM points_settings LIMIT 1) p
+          WHERE cc.status = 1
+            AND cc.course_id IN (${placeholders})
+          GROUP BY cc.id
+          ORDER BY cc.course_id ASC, cc.s_no ASC
+        `;
+
+        // 11 student_id placeholders before the IN(...) list:
+        const studentParams = [
+          student_id, // completed_lessons
+          student_id, // completed_quizzes
+          student_id, // total_quizzes
+          student_id, // completed_projects
+          student_id, // total_projects
+          student_id, // percent: lessons
+          student_id, // percent: quizzes
+          student_id, // percent: projects
+          student_id, // points: lessons
+          student_id, // points: projects
+          student_id  // points: quizzes
+        ];
+
+        connection.query(sqlChapters, studentParams.concat(courseIds), function (errCh, chapterRows) {
+          if (errCh) {
+            connection.release();
+            resultJson = '{"replyCode":"error","replyMsg":"' + errCh.message + '","cmd":"view_classes_info"}\n';
+            return callback(200, null, resultJson);
+          }
+
+          // 4) Group chapters by course_id
+          const byCourse = Object.create(null);
+          for (let i = 0; i < chapterRows.length; i++) {
+            const row = chapterRows[i];
+            if (!byCourse[row.course_id]) byCourse[row.course_id] = [];
+            byCourse[row.course_id].push(row);
+          }
+
+          // 5) Attach to courses
+          for (let i = 0; i < courses.length; i++) {
+            courses[i].total_points = grandTotalPoints; // preserve your original top-level field
+            courses[i].info = byCourse[courses[i].course_id] || [];
+          }
+
+          connection.release();
+          resultJson = JSON.stringify({
+            replyCode: 'success',
+            replyMsg: 'Details found successfully.',
+            data: courses,
+            cmd: 'view_classes_info'
+          }) + '\n';
+          return callback(200, null, resultJson);
+        });
+      });
     });
   });
 }
+
+
+
+
+function overall_leaderboard(userdata, pool, callback) {
+  let called = false;
+  function done(status, err, json, conn) {
+    if (called) { try { conn && conn.release(); } catch(e){}; return; }
+    called = true; try { conn && conn.release(); } catch(e){}
+    callback(status, err, json);
+  }
+
+  const school_code = (userdata && userdata.school_code) ? String(userdata.school_code).trim() : '';
+  const params = ['2']; // role_id
+
+  let sql =
+`SELECT
+   u.id, u.name, u.email, u.role_id, u.phone, u.image, u.school_code,
+   u.gender, u.deviceToken, u.class_name,
+   ROUND((slc.lesson_count*100)/NULLIF(tl.total_lessons,0),0) AS percent,
+   slc.total_points, s.name AS school_name
+ FROM users u
+ JOIN student_lesson_count slc ON slc.student_id = u.id
+ LEFT JOIN (
+   SELECT scs.student_id, SUM(clc.lesson_count) AS total_lessons
+   FROM student_course_subscription scs
+   LEFT JOIN course_lesson_count clc ON clc.course_id = scs.course_id
+   GROUP BY scs.student_id
+ ) tl ON tl.student_id = u.id
+ JOIN schools s ON s.code = u.school_code
+ WHERE slc.lesson_count IS NOT NULL
+   AND u.learning = 0
+   AND u.role_id = ?
+   AND u.name <> ''`;
+
+  if (school_code) { sql += ' AND u.school_code = ?'; params.push(school_code); }
+
+  sql += ' ORDER BY slc.total_points DESC, u.id DESC LIMIT 20 OFFSET 0';
+
+  pool.getConnection(function(err, connection){
+    if (err) {
+      return done(500, null, '{"replyCode":"error","replyMsg":"DB connection error","cmd":"school_user_list"}\n', null);
+    }
+
+    const queryOpts = { sql, values: params, timeout: 180000 }; // generous while validating
+    console.log('overall_leaderboard SQL:', sql, params);
+
+    const t0 = Date.now();
+    connection.query(queryOpts, function(qErr, rows){
+      console.log('overall_leaderboard took (ms):', Date.now() - t0);
+
+      if (qErr) {
+        console.error('overall_leaderboard error', qErr);
+        const msg = qErr && qErr.message ? qErr.message : String(qErr);
+        return done(500, null, `{"replyCode":"error","replyMsg":"${msg}","cmd":"school_user_list"}\n`, connection);
+      }
+
+      const json = `{"replyCode":"success","replyMsg":"Details found successfully .","data":${JSON.stringify(rows)},"cmd":"school_user_list"}\n`;
+      return done(200, null, json, connection);
+    });
+
+    connection.on('error', e => console.error('connection async error', e));
+  });
+}
+
 
 
 
@@ -14997,3 +15109,76 @@ function user_badges_point_list(userdata, pool, callback) {
 		});
 	});
 }
+
+//Doubts
+
+function doubts_list(userdata, pool, callback) {
+	var resultJson = "";
+	var user_id = "";
+  
+	if (typeof userdata.user_id != "undefined" && userdata.user_id != "") {
+	  user_id = userdata.user_id;
+	}
+	
+	console.log("----------");
+	console.log(userdata);
+  
+	pool.getConnection(function (err, connection) {
+		if(user_id=='0'){
+			var Catquery = 'SELECT user_doubts.*,"67986" as teacher_id,courses.course_name,teacher.name as teacher_name,teacher.image as teacher_image,student.name as student_name,student.image as student_image FROM user_doubts LEFT JOIN users as teacher ON teacher.id = "67986" LEFT JOIN users as student ON student.id = user_doubts.student_id LEFT JOIN courses as courses ON courses.id = user_doubts.course_id WHERE user_doubts.status !="2" AND user_doubts.teacher_id="' + user_id + '"  ';	
+		}else{
+			var Catquery = 'SELECT user_doubts.*,courses.course_name,teacher.name as teacher_name,teacher.image as teacher_image,student.name as student_name,student.image as student_image FROM user_doubts LEFT JOIN users as teacher ON teacher.id = user_doubts.teacher_id LEFT JOIN users as student ON student.id = user_doubts.student_id LEFT JOIN courses as courses ON courses.id = user_doubts.course_id WHERE user_doubts.status !="2" AND (user_doubts.teacher_id="' + user_id + '" OR user_doubts.student_id="' + user_id + '") ';	
+		}
+		
+		console.log("qq", Catquery);
+		connection.query(Catquery, function (errinsert, resPro) {
+			if (!errinsert) {
+				if(resPro.length >0){
+					var i = 0;
+					async.eachSeries(resPro,function(rec2, loop2){
+						var user_doubts_id = rec2.id;
+						console.log('user_doubts_id',user_doubts_id);
+						Cquery='SELECT doubts_chat.* from doubts_chat WHERE  doubts_chat.doubts_id="'+user_doubts_id+'" ORDER BY id DESC LIMIT 1';
+						console.log('Cquery',Cquery);
+						connection.query(Cquery, function(errSelpiMG,respROiMG){
+							if(errSelpiMG){
+								console.log('errSelpiMG',errSelpiMG);
+								loop2();
+							}else{
+								resPro[i].chats=respROiMG;
+								loop2();
+							}
+							i=i+1;
+						});
+					},function(errSelPro){
+						if(errSelPro){
+							console.log('errSelPro',errSelPro);
+							resultJson = '{"replyCode":"error","replyMsg":"'+errSelPro.message+'","cmd":"doubts_list"}\n';
+							connection.release();
+							callback(200, null, resultJson);
+							return;
+						}else{
+							resultJson = '{"replyCode":"success","replyMsg":"Details found successfully .","data":'+JSON.stringify(resPro)+',"cmd":"doubts_list"}\n';
+							console.log('res-suceess');
+							connection.release();
+							callback(200, null, resultJson);
+							return;
+						}
+					});
+				}else{
+					resultJson = '{"replyCode":"success","replyMsg":"No Record found.","data":[], "cmd":"doubts_list"}\n';
+					console.log('res-suceess');
+					connection.release();
+					callback(200, null, resultJson);
+					return;
+				}
+			} else {
+				resultJson='{"replyCode":"error","replyMsg":"'+errinsert.message+'","cmd":"chat group"}\n';
+				connection.release();
+				callback(200, null, resultJson);
+				return;
+			}
+		});
+	});
+}
+

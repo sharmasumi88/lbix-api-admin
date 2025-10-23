@@ -7,6 +7,7 @@ var fs                      = require('fs-extra'),
     Blog                    = require('./blogs.js'),
     async                   = require("async");
     https                   = require("https");
+     http                   = require("http");
 
 // node modules
 var logger                  = require('morgan');
@@ -18,7 +19,10 @@ var pool                    = mysql.createPool({
                                 user: config.mysql_user,
                                 password: config.mysql_password,
                                 database: config.mysql_database,
-                                timezone: 'Asia/Calcutta'
+                                timezone: 'Asia/Calcutta',
+                                waitForConnections: true,
+                                connectionLimit: 10,
+                                queueLimit: 0
                             });
 //const { BlobServiceClient } = require('azure-storage');
 const { BlobServiceClient } = require("@azure/storage-blob");
@@ -42,6 +46,32 @@ pool.query('SELECT 1 + 1 AS solution', function(err, rows, fields) {
 });
 
 
+// at top-level (once)
+const { createClient } = require('redis');
+const redis = createClient({ url: process.env.REDIS_URL || 'redis://127.0.0.1:6379' });
+redis.on('error', (e) => console.error('Redis error:', e));
+(async () => { try { await redis.connect(); } catch (e) { console.error('Redis connect failed:', e); } })();
+
+const SUMMARY_TTL_SECONDS = 30000; // 5 minutes
+const EMPTY_TTL_SECONDS = 60;    // short cache for "no record" results
+
+// helpers (promise-style) for both v3/v4
+const getAsync = (key) => {
+  if (typeof redis.get === 'function' && redis.get.length <= 1) return redis.get(key);        // v4
+  return util.promisify(redis.get.bind(redis))(key);                                          // v3
+};
+const setExAsync = (key, ttl, val) => {
+  if (typeof redis.setEx === 'function') return redis.setEx(key, ttl, val);                   // v4
+  if (typeof redis.setex === 'function') return util.promisify(redis.setex.bind(redis))(key, ttl, val); // v3
+  // fallback: set + expire
+  const setP = util.promisify(redis.set.bind(redis))(key, val);
+  const expP = util.promisify(redis.expire.bind(redis))(key, ttl);
+  return setP.then(() => expP);
+};
+const delAsync = (key) => util.promisify(redis.del.bind(redis))(key);
+
+
+
 // parse body data
 var app = express();
 app.use(logger('dev'));
@@ -49,35 +79,34 @@ app.use(express.static(__dirname + '/public'));
 app.use(bodyParser.urlencoded({limit: '50mb', extended: false}));
 app.use(bodyParser.json({limit: '50mb'}));
 
-var privateKey = fs.readFileSync('keys/privkey.pem').toString();
-var certificate = fs.readFileSync('keys/cert.pem').toString();
-var caf = fs.readFileSync('keys/chain.pem').toString();
-var credentials = {key: privateKey, cert: certificate,ca:caf};
+// TLS/HTTPS setup (fallback to HTTP if keys missing)
+let server;
+try {
+  const privateKey = fs.readFileSync(path.join(__dirname, 'keys/privkey.pem'));
+  const certificate = fs.readFileSync(path.join(__dirname, 'keys/cert.pem'));
+  const caf = fs.readFileSync(path.join(__dirname, 'keys/chain.pem'));
+  const credentials = { key: privateKey, cert: certificate, ca: caf };
+  const httpsServer = http.createServer(app);
+  server = httpsServer.listen(config.port, () => {
+    console.log(`${config.SITE_TITLE} (HTTPS) server listening on port ${config.port}`);
+  });
+} catch (err) {
+  console.warn('TLS keys not found or failed to load — falling back to HTTP. Error:', err.message || err);
+  server = app.listen(config.port, () => {
+    console.log(`${config.SITE_TITLE} (HTTP) server listening on port ${config.port}`);
+  });
+}
 
-var httpsServer = https.createServer(credentials, app);
+// middleware to log request body and set headers
+app.use((req, res, next) => {
+  const userdata = req.body;
+  if (config.DEBUG > 0) {
+    console.log(`######### ${req.url} called with:`, userdata);
+  }
 
-//var httpsServer = http.createServer( app);
-
-
-var server = httpsServer.listen(config.port, function () {
-    var host = server.address().address;
-    var port = server.address().port;
-    
-    console.log(config.SITE_TITLE, ' server listening on port', port);
-});
-
-app.use(function (req, res, next) {
-    var userdata = req.body;
-    if (config.DEBUG > 0)
-        console.log('####################################### ' + req.url + ' API IS CALLED WITH DATA: ', userdata);
-        //console.log('headers',JSON.stringify(req.headers));
-    fs.appendFile("postdata.txt",JSON.stringify(userdata), function(err22) {
-    
-    });
-
-    res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-    next();
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  next();
 });
 
 
@@ -4159,7 +4188,6 @@ app.post('/add_school_grade', function (req, res) {
 });
 
 
-
 app.post('/overall_details_student', function (req, res) {
     var userdata = req.body;
     Users.overall_details_student(userdata, pool, function (http_status_code, err, response) {
@@ -4474,24 +4502,10 @@ app.post('/user_list', function (req, res) {
     });
 });
 
+
 app.post('/courses_list', function (req, res) {
     var userdata = req.body;
     Admin.courses_list(userdata, pool, function (http_status_code, err, response) {
-        if (err) {
-            console.log(err);
-            throw err;
-        }
-        if (config.DEBUG == 2)
-            console.log(response);
-            res.status(http_status_code).send(response);
-    });
-});
-
-
-
-app.post('/assign_course_to_student', function (req, res) {
-    var userdata = req.body;
-    Admin.assign_course_to_student(userdata, pool, function (http_status_code, err, response) {
         if (err) {
             console.log(err);
             throw err;
@@ -4535,7 +4549,7 @@ app.post('/school_grades_list', function (req, res) {
     var userdata = req.body;
     Admin.school_grades_list(userdata, pool, function (http_status_code, err, response) {
         if (err) {
-			console.log(err);
+            console.log(err);
             throw err;
         }
         if (config.DEBUG == 2)
@@ -4548,7 +4562,7 @@ app.post('/overall_details_teacher', function (req, res) {
     var userdata = req.body;
     Users.overall_details_teacher(userdata, pool, function (http_status_code, err, response) {
         if (err) {
-			console.log(err);
+            console.log(err);
             throw err;
         }
         if (config.DEBUG == 2)
@@ -4557,11 +4571,26 @@ app.post('/overall_details_teacher', function (req, res) {
     });
 });
 
+
+app.post('/admin_school_generated_payout_list', function (req, res) {
+    var userdata = req.body;
+    Admin.admin_school_generated_payout_list(userdata, pool, function (http_status_code, err, response) {
+        if (err) {
+            console.log(err);
+            throw err;
+        }
+        if (config.DEBUG == 2)
+            console.log(response);
+            res.status(http_status_code).send(response);
+    });
+});
+
+
 app.post('/badges_list', function (req, res) {
     var userdata = req.body;
     Admin.badges_list(userdata, pool, function (http_status_code, err, response) {
         if (err) {
-			console.log(err);
+            console.log(err);
             throw err;
         }
         if (config.DEBUG == 2)
@@ -4575,7 +4604,7 @@ app.post('/grades_list', function (req, res) {
     var userdata = req.body;
     Users.grades_list(userdata, pool, function (http_status_code, err, response) {
         if (err) {
-			console.log(err);
+            console.log(err);
             throw err;
         }
         if (config.DEBUG == 2)
@@ -4584,11 +4613,12 @@ app.post('/grades_list', function (req, res) {
     });
 });
 
+
 app.post('/school_user_list',function (req, res) {
     var userdata = req.body;
     Users.school_user_list(userdata, pool, function (http_status_code, err, response) {
         if (err) {
-			console.log(err);
+            console.log(err);
             throw err;
         }else{
            // client.flushall('ASYNC');
@@ -4776,6 +4806,8 @@ app.post('/assign_course_to_student', function (req, res) {
     });
 });
 
+
+
 app.post('/login', function (req, res) {
     var userdata = req.body;
     Admin.login(userdata, pool, function (http_status_code, err, response) {
@@ -4791,10 +4823,120 @@ app.post('/login', function (req, res) {
 });
 
 
-// new studet course track
-app.post('/student_course_summary_track', function (req, res) {
+// new student course track
+app.post('/student_course_summary_track', async function (req, res) {
+  const userdata = req.body || {};
+  const student_id = userdata.student_id ? String(userdata.student_id) : '';
+  const cacheKey = `student:course_summary:${student_id}`;
+
+  if (!student_id) {
+    return res
+      .status(200)
+      .send('{"replyCode":"error","replyMsg":"student_id is required","cmd":"view_classes_info"}\n');
+  }
+
+  // 1) Try cache
+  try {
+    const cached = await redis.get(cacheKey);
+    if (cached) {
+      if (config.DEBUG == 2) console.log('[cache HIT]', cacheKey);
+      return res.status(200).send(cached.endsWith('\n') ? cached : cached + '\n');
+    }
+  } catch (e) {
+    console.error('Redis GET failed:', e);
+    // fall through to DB
+  }
+
+  // 2) Cache miss → run original function
+  Admin.student_course_summary_track(userdata, pool, function (http_status_code, err, response) {
+    if (err) {
+      console.error(err);
+      // don't cache errors
+      return res.status(http_status_code || 500).send(
+        '{"replyCode":"error","replyMsg":"Internal error","cmd":"view_classes_info"}\n'
+      );
+    }
+
+    if (config.DEBUG == 2) console.log('[cache MISS] storing', cacheKey);
+
+    // 3) Decide TTL based on payload
+    let ttl = SUMMARY_TTL_SECONDS;
+    try {
+      const parsed = JSON.parse(response);
+      // cache "No Record found." briefly to avoid hammering
+      if (parsed && parsed.replyCode === 'success' && Array.isArray(parsed.data) && parsed.data.length === 0) {
+        ttl = EMPTY_TTL_SECONDS;
+      }
+    } catch (_) {
+      // if parsing fails, keep default ttl but don't crash
+    }
+
+    // 4) Store in Redis (best-effort)
+    redis.setEx(cacheKey, ttl, response).catch((e) => console.error('Redis SETEX failed:', e));
+
+    // 5) Return to client
+    return res.status(http_status_code).send(response);
+  });
+});
+
+
+app.post('/overall_leaderboard', function (req, res) {
+  const userdata = req.body || {};
+  const role_id = (userdata.role_id != null ? String(userdata.role_id) : '2'); // default 2
+  const school_code = userdata.school_code ? String(userdata.school_code).trim() : '';
+  const cacheKey = `overall_leaderboard:v1:role:${role_id}:school:${school_code || '-'}`;
+
+  // 1) try cache
+  getAsync(cacheKey).then((cached) => {
+    if (cached) {
+      if (config.DEBUG == 2) console.log('[overall_leaderboard][CACHE HIT]', cacheKey);
+      return res.status(200).send(cached.endsWith('\n') ? cached : cached + '\n');
+    }
+
+    // 2) miss → call original handler
+    if (config.DEBUG == 2) console.log('[overall_leaderboard][CACHE MISS]', cacheKey);
+    Admin.overall_leaderboard(userdata, pool, function (http_status_code, err, response) {
+      if (err) {
+        console.error('overall_leaderboard err:', err);
+        return res.status(http_status_code || 500).send(
+          '{"replyCode":"error","replyMsg":"Internal error","cmd":"school_user_list"}\n'
+        );
+      }
+
+      // 3) choose TTL based on payload
+      let ttl = SUMMARY_TTL_SECONDS;
+      try {
+        const parsed = JSON.parse(response);
+        if (parsed && parsed.replyCode === 'success' && Array.isArray(parsed.data) && parsed.data.length === 0) {
+          ttl = EMPTY_TTL_SECONDS;
+        }
+      } catch (_) {}
+
+      // 4) best-effort cache
+      setExAsync(cacheKey, ttl, response).catch((e) => console.error('Redis setEx failed:', e));
+
+      return res.status(http_status_code).send(response);
+    });
+  }).catch((e) => {
+    console.error('Redis GET failed:', e);
+    // fall back to DB path
+    Admin.overall_leaderboard(userdata, pool, function (http_status_code, err, response) {
+      if (err) {
+        console.error('overall_leaderboard err:', err);
+        return res.status(http_status_code || 500).send(
+          '{"replyCode":"error","replyMsg":"Internal error","cmd":"school_user_list"}\n'
+        );
+      }
+      return res.status(http_status_code).send(response);
+    });
+  });
+});
+
+
+
+app.post('/user_badges_point_list', function (req, res) {
     var userdata = req.body;
-    Admin.student_course_summary_track(userdata, pool, function (http_status_code, err, response) {
+    Admin.user_badges_point_list(userdata, pool, function (http_status_code, err, response) {
         if (err) {
             console.log(err);
             throw err;
@@ -4806,11 +4948,11 @@ app.post('/student_course_summary_track', function (req, res) {
 });
 
 
-app.post('/overall_leaderboard', function (req, res) {
+app.post('/doubts_list', function (req, res) {
     var userdata = req.body;
-    Admin.overall_leaderboard(userdata, pool, function (http_status_code, err, response) {
+    Admin.doubts_list(userdata, pool, function (http_status_code, err, response) {
         if (err) {
-			console.log(err);
+            console.log(err);
             throw err;
         }
         if (config.DEBUG == 2)
@@ -4820,17 +4962,5 @@ app.post('/overall_leaderboard', function (req, res) {
 });
 
 
-app.post('/user_badges_point_list', function (req, res) {
-    var userdata = req.body;
-    Admin.user_badges_point_list(userdata, pool, function (http_status_code, err, response) {
-        if (err) {
-			console.log(err);
-            throw err;
-        }
-        if (config.DEBUG == 2)
-            console.log(response);
-            res.status(http_status_code).send(response);
-    });
-});
 
 module.exports = app;
