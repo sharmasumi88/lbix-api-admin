@@ -4790,4 +4790,47 @@ app.post('/login', function (req, res) {
     });
 });
 
+
+// new studet course track
+app.post('/student_course_summary_track', function (req, res) {
+    var userdata = req.body;
+    Admin.student_course_summary_track(userdata, pool, function (http_status_code, err, response) {
+        if (err) {
+            console.log(err);
+            throw err;
+        }
+        if (config.DEBUG == 2)
+            console.log(response);
+            res.status(http_status_code).send(response);
+    });
+});
+
+
+app.post('/overall_leaderboard', function (req, res) {
+    var userdata = req.body;
+    Admin.overall_leaderboard(userdata, pool, function (http_status_code, err, response) {
+        if (err) {
+			console.log(err);
+            throw err;
+        }
+        if (config.DEBUG == 2)
+            console.log(response);
+            res.status(http_status_code).send(response);
+    });
+});
+
+
+app.post('/user_badges_point_list', function (req, res) {
+    var userdata = req.body;
+    Admin.user_badges_point_list(userdata, pool, function (http_status_code, err, response) {
+        if (err) {
+			console.log(err);
+            throw err;
+        }
+        if (config.DEBUG == 2)
+            console.log(response);
+            res.status(http_status_code).send(response);
+    });
+});
+
 module.exports = app;

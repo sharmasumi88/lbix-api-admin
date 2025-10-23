@@ -324,6 +324,13 @@ module.exports.admin_school_generated_payout_list = admin_school_generated_payou
 module.exports.assign_course_to_student_bulk = assign_course_to_student_bulk;
 module.exports.assign_course_to_student = assign_course_to_student;
 
+//
+
+module.exports.student_course_summary_track = student_course_summary_track;
+module.exports.overall_leaderboard = overall_leaderboard;
+
+module.exports.user_badges_point_list = user_badges_point_list;
+
 
 var ToDate = new Date();
 var weekday = new Array('Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday');
@@ -14820,6 +14827,149 @@ function login(userdata, pool, callback) {
 				resultJson = '{"replyCode":"error","replyMsg":"' + err.message + '","cmd":"login"}\n';
 				connection.release();
 				callback(400, null, resultJson);
+				return;
+			}
+		});
+	});
+}
+
+
+
+function student_course_summary_track(userdata, pool, callback){
+	var resultJson = '';
+	var student_id ='';
+	
+	if (typeof userdata.student_id != 'undefined' && userdata.student_id != ''){
+		student_id = userdata.student_id;
+	}
+	
+	console.log('----------');
+	console.log(userdata);
+	pool.getConnection(function (err, connection){
+		var Catquery='SELECT student_course_subscription.course_id,student_course_subscription.course_start_date,student_course_subscription.certificate_name,courses.course_name,courses.description,courses.image,courses.course_ppt,(SELECT SUM(total_points) from student_course_summary_points where student_course_summary_points.student_id ="'+student_id+'") as total_points  from student_course_subscription LEFT JOIN courses as courses ON courses.id = student_course_subscription.course_id WHERE  student_course_subscription.student_id="'+student_id+'"';
+		console.log('qq',Catquery)
+		connection.query(Catquery, function(errinsert, resPro){
+			if(!errinsert){
+				if(resPro.length >0){
+					var i = 0;
+					async.eachSeries(resPro,function(rec2, loop2){
+						var course_id = rec2.course_id;
+						console.log('course_id',course_id);
+						proiMGquery = 'SELECT course_chapters.*,(SELECT count(*) from chapter_lessons WHERE chapter_lessons.course_chapter_id=course_chapters.id AND chapter_lessons.status="1") as total_lessons,(SELECT count(*) from student_lessons_status WHERE student_lessons_status.student_id="'+student_id+'" AND student_lessons_status.chapter_id=course_chapters.id AND student_lessons_status.percentage >"90") + (SELECT count(*) from student_quizzes WHERE student_quizzes.student_id="'+student_id+'" AND student_quizzes.chapter_id=course_chapters.id AND student_quizzes.in_review ="2") +(SELECT count(*) from student_projects WHERE student_projects.student_id="'+student_id+'" AND student_projects.chapter_id=course_chapters.id AND student_projects.in_review ="1") as complete_lessons,(SELECT count(*) from student_quizzes WHERE student_quizzes.student_id="'+student_id+'" AND student_quizzes.chapter_id=course_chapters.id AND student_quizzes.in_review ="2") as completed_quizzes,(SELECT count(*) from student_quizzes WHERE student_quizzes.student_id="'+student_id+'" AND student_quizzes.chapter_id=course_chapters.id ) as total_quizzes,(SELECT count(*) from student_projects WHERE student_projects.student_id="'+student_id+'" AND student_projects.chapter_id=course_chapters.id AND student_projects.in_review ="1") as completed_projects,(SELECT count(*) from student_projects WHERE student_projects.student_id="'+student_id+'" AND student_projects.chapter_id=course_chapters.id AND student_projects.in_review ="1") as total_projects, round((((SELECT count(*) from student_lessons_status WHERE student_lessons_status.student_id="'+student_id+'" AND student_lessons_status.chapter_id=course_chapters.id AND student_lessons_status.percentage >"90") + (SELECT count(*) from student_quizzes WHERE student_quizzes.student_id="'+student_id+'" AND student_quizzes.chapter_id=course_chapters.id AND student_quizzes.in_review ="2") +(SELECT count(*) from student_projects WHERE student_projects.student_id="'+student_id+'" AND student_projects.chapter_id=course_chapters.id AND student_projects.in_review ="1") * 100) / (SELECT count(*) from chapter_lessons WHERE chapter_lessons.course_chapter_id=course_chapters.id AND chapter_lessons.status="1")), 0) AS percent,((((SELECT count(*) from student_lessons_status WHERE student_lessons_status.student_id="'+student_id+'" AND student_lessons_status.chapter_id=course_chapters.id AND student_lessons_status.percentage >"90") + (SELECT count(*) from student_quizzes WHERE student_quizzes.student_id="'+student_id+'" AND student_quizzes.chapter_id=course_chapters.id AND student_quizzes.in_review ="2") +(SELECT count(*) from student_projects WHERE student_projects.student_id="'+student_id+'" AND student_projects.chapter_id=course_chapters.id AND student_projects.in_review ="1") * (select points_settings.class_points from points_settings)) + ((SELECT count(*) from student_projects WHERE student_projects.student_id="'+student_id+'" AND student_projects.chapter_id=course_chapters.id AND student_projects.in_review ="1") * (select points_settings.project_points from points_settings points_settings))) + ((SELECT count(*) from student_projects WHERE student_projects.student_id="'+student_id+'" AND student_projects.chapter_id=course_chapters.id AND student_projects.in_review ="1") * (select points_settings.quiz_points from points_settings points_settings))) AS total_points from course_chapters where course_chapters.course_id="'+course_id+'" AND course_chapters.status="1" ORDER BY course_chapters.s_no ASC';
+						console.log('proiMGquery',proiMGquery);
+						connection.query(proiMGquery, function(errSelpiMG,respROiMG){
+							if(errSelpiMG){
+								console.log('errSelpiMG',errSelpiMG);
+								
+								loop2();
+							}else{
+								resPro[i].info=respROiMG;
+								loop2();
+							}
+							i=i+1;
+						});
+						
+					},function(errSelPro){
+						if(errSelPro){
+							console.log('errSelPro',errSelPro)
+							resultJson = '{"replyCode":"error","replyMsg":"'+errSelPro.message+'","cmd":"view_classes_info"}\n';
+							connection.release();
+							callback(200, null, resultJson);
+							return;
+						}else{
+							resultJson = '{"replyCode":"success","replyMsg":"Details found successfully .","data":'+JSON.stringify(resPro)+',"cmd":"view_classes_info"}\n';
+							console.log('res-suceess');
+							connection.release();
+							callback(200, null, resultJson);
+							return;
+						}
+					});
+				}else{
+					resultJson = '{"replyCode":"success","replyMsg":"No Record found.","data":[], "cmd":"view_classes_info"}\n';
+					console.log('res-suceess');
+					connection.release();
+					callback(200, null, resultJson);
+					return;
+				}
+			}else{
+				resultJson = '{"replyCode":"error","replyMsg":"' + errinsert.message + '","cmd":"view_classes_info"}\n';
+				connection.release();
+				callback(200, null, resultJson);
+				return;
+			}
+		});	
+	});
+}
+
+
+
+
+/* user List */
+function overall_leaderboard(userdata, pool, callback) {
+	var resultJson = '';
+	var school_code='';
+	var Keyconditoin=' AND role_id="2"';
+	console.log('userdata',userdata)
+	if (typeof userdata.school_code  != 'undefined' && userdata.school_code  != '') {
+		school_code  = userdata.school_code ;
+	}
+	pool.getConnection(function (err, connection) {
+		if (school_code != '') {
+			Keyconditoin += ' AND school_code ="' + school_code + '"';
+		}
+		
+		var Catquery='Select * from overall_leaderboard where name !="" '+Keyconditoin+' LIMIT 0,20';
+		connection.query(Catquery, function(errSelpiMG,respROiMG){
+			if(errSelpiMG){
+				
+				resultJson = '{"replyCode":"error","replyMsg":"'+errSelpiMG.message+'","cmd":"school_user_list"}\n';
+				connection.release();
+				callback(200, null, resultJson);
+				return;
+			}else{
+				console.log('respROiMG',respROiMG)
+				resultJson = '{"replyCode":"success","replyMsg":"Details found successfully .","data":'+JSON.stringify(respROiMG)+',"cmd":"school_user_list"}\n';
+				console.log('res-suceess');
+				connection.release();
+				callback(200, null, resultJson);
+				return;
+			}
+		});
+	});
+}
+
+
+
+/* user points  list */
+function user_badges_point_list(userdata, pool, callback) {
+	var resultJson = '';
+	var strJson = '';
+	var keyword = '';
+	var student_id = '';
+
+	if (typeof userdata.keyword != 'undefined' && userdata.keyword != '') {
+		keyword = userdata.keyword;
+	}
+	if (typeof userdata.student_id != 'undefined' && userdata.student_id != '') {
+		student_id = userdata.student_id;
+	}
+
+	pool.getConnection(function (err, connection) {
+		var Catquery = 'SELECT user_points.*,(SELECT SUM(points) from user_points where user_points.type="0") as type0,(SELECT SUM(points) from user_points where user_points.type="1") as type1,(SELECT SUM(points) from user_points where user_points.type="2") as type2,(SELECT SUM(points) from user_points where user_points.type="3") as type3,(SELECT SUM(points) from user_points where user_points.type="4") as type4 FROM user_points WHERE user_points.user_id ="' + student_id + '" ORDER BY user_points.id DESC';
+
+		connection.query(Catquery, function (err, result) {
+			if (err) {
+				resultJson = '{"replyCode":"error","replyMsg":"' + err.message + '","cmd":"user_badges_point_list"}\n';
+				connection.release();
+				callback(200, null, resultJson);
+				return;
+			} else {
+				resultJson =
+					'{"replyCode":"success","replyMsg":"badge list","data":' + JSON.stringify(result) +
+					', "cmd":"user_badges_point_list"}\n';
+				console.log('res-suceess');
+				connection.release();
+				callback(200, null, resultJson);
 				return;
 			}
 		});
