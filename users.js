@@ -4282,14 +4282,14 @@ function my_orders(userdata, pool, callback){
 		Keyconditoin +=' AND courses.robotics_type ="'+type+'"';
 	}
 	
-	if(course_type !=''){
-		if(course_type=='3'){
-			// Keyconditoin +=' AND courses.course_type ="3" OR courses.course_type ="4"';
-			Keyconditoin +=' AND courses.course_type ="3"';
-		}else{
-			Keyconditoin +=' AND courses.course_type ="'+course_type+'"';
-		}
-	}
+	// if(course_type !=''){
+	// 	if(course_type=='3'){
+	// 		// Keyconditoin +=' AND courses.course_type ="3" OR courses.course_type ="4"';
+	// 		Keyconditoin +=' AND courses.course_type ="3"';
+	// 	}else{
+	// 		Keyconditoin +=' AND courses.course_type ="'+course_type+'"';
+	// 	}
+	// }
 
 	pool.getConnection(function (err, connection) {
 		var student_id=hashids.decode(sid);
